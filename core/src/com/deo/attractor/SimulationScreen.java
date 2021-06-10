@@ -4,20 +4,14 @@ import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
-import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
-import com.badlogic.gdx.graphics.g3d.Environment;
-import com.badlogic.gdx.graphics.g3d.ModelBatch;
-import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
 import com.badlogic.gdx.graphics.g3d.utils.CameraInputController;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector3;
@@ -31,8 +25,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.BufferUtils;
-import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.deo.attractor.Utils.MathExpression;
 
@@ -40,6 +32,8 @@ import java.util.ArrayList;
 
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
+import static com.deo.attractor.Utils.Utils.interpolate;
+import static com.deo.attractor.Utils.Utils.makeAScreenShot;
 import static java.lang.StrictMath.abs;
 import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
@@ -58,21 +52,20 @@ public class SimulationScreen implements Screen {
     BitmapFont font;
     ShapeRenderer renderer;
     
-    private final ModelBatch modelBatch;
-    private final Environment environment;
-    
     boolean recording = true;
     int frame = 0;
     
-    float spread = 2;
-    int attractorType = 2;
-    int numberOfPoints = 500;
+    float spread = 1;
+    int palette = 1;
+    int attractorType = 4;
+    int numberOfPoints = 10;
+    int pointsPerCurve = 1000;
     boolean settingsMode = false;
     float currentTimeStep;
     
     private final MathExpression[] simRules;
     
-    private final Array<Point> points;
+    private final Array<Point> curves;
     
     private final CameraInputController cameraInputController;
     
@@ -90,6 +83,8 @@ public class SimulationScreen implements Screen {
             {Color.CLEAR, Color.ORANGE, Color.RED, Color.GRAY},
             {Color.CLEAR, Color.LIME, Color.TEAL, Color.CLEAR},
             {Color.CLEAR, Color.SKY, Color.SKY, Color.CLEAR, Color.CLEAR, Color.TEAL, Color.TEAL, Color.CLEAR}};
+    
+    Array<Color> colors;
     
     SimulationScreen(Game game) {
         
@@ -196,13 +191,17 @@ public class SimulationScreen implements Screen {
         }
         currentTimeStep = maxTimestep;
         
-        points = new Array<>();
+        colors = new Array<>();
+        for (int i = 0; i < pointsPerCurve; i++) {
+            colors.add(new Color(interpolate(i, pointsPerCurve, availablePalettes[palette])));
+        }
+        curves = new Array<>();
         for (int i = 0; i < numberOfPoints; i++) {
-            points.add(new Point(new Vector3(
+            curves.add(new Point(new Vector3(
                     (float) (random() * spread),
                     (float) (random() * spread),
                     (float) (random() * spread)),
-                    availablePalettes[1], simRules, maxTimestep, scale));
+                    simRules, maxTimestep, scale, pointsPerCurve));
         }
         
         cam = new PerspectiveCamera(67, WIDTH, HEIGHT);
@@ -216,16 +215,22 @@ public class SimulationScreen implements Screen {
         renderer = new ShapeRenderer();
         renderer.setAutoShapeType(true);
         
-        modelBatch = new ModelBatch();
-        
-        environment = new Environment();
-        
-        environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.3f, 0.3f, 0.3f, 1f));
-        
         pointGraph = new ArrayList<>();
         
         cameraInputController = new CameraInputController(cam);
         Gdx.input.setInputProcessor(cameraInputController);
+        
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    for (int i = 0; i < curves.size; i++) {
+                        curves.get(i).advance();
+                    }
+                }
+            }
+        }).start();
+        
     }
     
     @Override
@@ -243,45 +248,35 @@ public class SimulationScreen implements Screen {
         
         cameraInputController.update();
         
-        modelBatch.begin(cam);
+        renderer.setProjectionMatrix(cam.combined);
+        renderer.begin(ShapeRenderer.ShapeType.Line);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        
-        for (int i = 0; i < points.size; i++) {
-            points.get(i).render(environment, modelBatch);
+        for (int p = 0; p < pointsPerCurve - 1; p++) {
+            renderer.setColor(colors.get(p));
+            for (int i = 0; i < curves.size; i++) {
+                renderer.line(curves.get(i).points.get(p), curves.get(i).points.get(p + 1));
+            }
         }
-        
-        modelBatch.end();
+        renderer.end();
         
         if (recording) {
             makeAScreenShot(frame);
             frame++;
         }
         
-        if (recording) {
-            for (int i = 0; i < points.size; i++) {
-                points.get(i).advance();
-            }
-        } else {
-            for (int n = 0; n < 1 / currentTimeStep / 50f; n++) {
-                for (int i = 0; i < points.size; i++) {
-                    points.get(i).advance();
-                }
-            }
-        }
-        
         if (pointGraph.size() > WIDTH * graphScale) {
             for (int i = 0; i < pointGraph.size() - 1; i++) {
                 pointGraph.set(i, pointGraph.get(i + 1));
             }
-            pointGraph.set(pointGraph.size() - 1, points.get(0).points.get(points.get(0).points.size - 1));
+            pointGraph.set(pointGraph.size() - 1, curves.get(0).points.get(curves.get(0).points.size - 1));
         } else {
-            pointGraph.add(points.get(0).points.get(points.get(0).points.size - 1));
+            pointGraph.add(curves.get(0).points.get(curves.get(0).points.size - 1));
         }
         
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
-            for (int i = 0; i < points.size; i++) {
-                points.get(i).resetTrail();
+            for (int i = 0; i < curves.size; i++) {
+                curves.get(i).resetTrail();
             }
             maxUpperGraphAmplitude = 1;
             maxBottomGraphAmplitude = 1;
@@ -289,8 +284,8 @@ public class SimulationScreen implements Screen {
         }
         
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
-            for (int i = 0; i < points.size; i++) {
-                points.get(i).reset();
+            for (int i = 0; i < curves.size; i++) {
+                curves.get(i).reset();
             }
         }
         
@@ -313,10 +308,10 @@ public class SimulationScreen implements Screen {
             renderer.setProjectionMatrix(camera.combined);
             renderer.begin();
             float multiplier = WIDTH / (float) numberOfPoints;
-            for (int n = 0; n < points.size - 1; n++) {
+            for (int n = 0; n < curves.size - 1; n++) {
                 int i = n * (int) multiplier;
-                Vector3 point = points.get(n).points.get(points.get(n).points.size - 1);
-                Vector3 nextPoint = points.get(n + 1).points.get(points.get(n + 1).points.size - 1);
+                Vector3 point = curves.get(n).points.get(curves.get(n).points.size - 1);
+                Vector3 nextPoint = curves.get(n + 1).points.get(curves.get(n + 1).points.size - 1);
                 renderer.setColor(Color.RED);
                 renderer.line(i - WIDTH / 2f, point.x / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, nextPoint.x / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f);
                 renderer.setColor(Color.GREEN);
@@ -341,11 +336,11 @@ public class SimulationScreen implements Screen {
                 maxUpperGraphAmplitude = max(maxUpperGraphAmplitude, abs(pointGraph.get(n).z));
             }
             renderer.setColor(Color.YELLOW);
-            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, points.get(0).points, "x");
+            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, curves.get(0).points, "x");
             renderer.setColor(Color.CYAN);
-            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, points.get(0).points, "y");
+            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, curves.get(0).points, "y");
             renderer.setColor(Color.MAGENTA);
-            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, points.get(0).points, "z");
+            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, curves.get(0).points, "z");
             renderer.end();
             
             batch.begin();
@@ -433,25 +428,5 @@ public class SimulationScreen implements Screen {
     
     @Override
     public void dispose() {
-        modelBatch.dispose();
-        for (int i = 0; i < points.size; i++) {
-            points.get(i).dispose();
-        }
-        points.clear();
-    }
-    
-    public void makeAScreenShot(int recorderFrame) {
-        
-        byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), true);
-        
-        for (int i4 = 4; i4 < pixels.length; i4 += 4) {
-            pixels[i4 - 1] = (byte) 255;
-        }
-        
-        FileHandle file = Gdx.files.external("GollyRender/pict" + recorderFrame + ".png");
-        Pixmap pixmap = new Pixmap(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), Pixmap.Format.RGBA8888);
-        BufferUtils.copy(pixels, 0, pixmap.getPixels(), pixels.length);
-        PixmapIO.writePNG(file, pixmap);
-        pixmap.dispose();
     }
 }
