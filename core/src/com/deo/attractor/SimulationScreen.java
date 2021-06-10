@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
 import static java.lang.StrictMath.abs;
+import static java.lang.StrictMath.max;
+import static java.lang.StrictMath.min;
 import static java.lang.StrictMath.random;
 
 public class SimulationScreen implements Screen {
@@ -55,7 +57,7 @@ public class SimulationScreen implements Screen {
     private final Environment environment;
     
     float spread = 2;
-    int attractorType = 0;
+    int attractorType = 2;
     int numberOfPoints = 70;
     boolean settingsMode = false;
     float currentTimeStep;
@@ -68,6 +70,9 @@ public class SimulationScreen implements Screen {
     
     private final ArrayList<Vector3> pointGraph;
     private final float graphScale = 1;
+    private float maxUpperGraphAmplitude = 1;
+    private float maxBottomGraphAmplitude = 1;
+    private float max2DGraphAmplitude = 1;
     
     final String fontChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890\"!`?'.,;:()[]{}<>|/@\\^$€-%+=#_&~*ёйцукенгшщзхъэждлорпавыфячсмитьбюЁЙЦУКЕНГШЩЗХЪЭЖДЛОРПАВЫФЯЧСМИТЬБЮ";
     
@@ -134,6 +139,7 @@ public class SimulationScreen implements Screen {
                 simRules[1] = new MathExpression("a * y - b * z - b * x - z*z", bulkArgs, constants);
                 simRules[2] = new MathExpression("a * z - b * x - b * y - x*x", bulkArgs, constants);
                 maxTimestep = 0.005f;
+                spread = 1;
                 break;
             case (3):
                 constants = new String[]{"a = 0.45", "b = 0.75"};
@@ -256,6 +262,15 @@ public class SimulationScreen implements Screen {
             for (int i = 0; i < points.size; i++) {
                 points.get(i).resetTrail();
             }
+            maxUpperGraphAmplitude = 1;
+            maxBottomGraphAmplitude = 1;
+            max2DGraphAmplitude = 1;
+        }
+    
+        if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
+            for(int i = 0; i<points.size; i++){
+                points.get(i).reset();
+            }
         }
         
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
@@ -267,7 +282,6 @@ public class SimulationScreen implements Screen {
             }
         }
         
-        
         if (settingsMode) {
             batch.setProjectionMatrix(camera.combined);
             
@@ -276,23 +290,37 @@ public class SimulationScreen implements Screen {
             float multiplier = WIDTH / (float) numberOfPoints;
             for (int n = 0; n < points.size - 1; n++) {
                 int i = n * (int) multiplier;
+                Vector3 point = points.get(n).points.get(points.get(n).points.size - 1);
+                Vector3 nextPoint = points.get(n + 1).points.get(points.get(n + 1).points.size - 1);
                 renderer.setColor(Color.RED);
-                renderer.line(i - WIDTH / 2f, points.get(n).points.get(points.get(n).points.size - 1).x * 10 + 25 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, points.get(n + 1).points.get(points.get(n).points.size - 1).x * 10 + 25 - HEIGHT / 2f);
+                renderer.line(i - WIDTH / 2f, point.x / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, nextPoint.x / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f);
                 renderer.setColor(Color.GREEN);
-                renderer.line(i - WIDTH / 2f, points.get(n).points.get(points.get(n).points.size - 1).y * 10 + 25 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, points.get(n + 1).points.get(points.get(n).points.size - 1).y * 10 + 25 - HEIGHT / 2f);
+                renderer.line(i - WIDTH / 2f, point.y / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, nextPoint.y / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f);
                 renderer.setColor(Color.BLUE);
-                renderer.line(i - WIDTH / 2f, points.get(n).points.get(points.get(n).points.size - 1).z * 10 + 25 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, points.get(n + 1).points.get(points.get(n).points.size - 1).z * 10 + 25 - HEIGHT / 2f);
+                renderer.line(i - WIDTH / 2f, point.z / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f, i + multiplier - WIDTH / 2f, nextPoint.z / maxBottomGraphAmplitude * 15 + 30 - HEIGHT / 2f);
+                maxBottomGraphAmplitude = max(maxBottomGraphAmplitude, abs(point.x));
+                maxBottomGraphAmplitude = max(maxBottomGraphAmplitude, abs(point.y));
+                maxBottomGraphAmplitude = max(maxBottomGraphAmplitude, abs(point.z));
             }
             float multiplier2 = 1 / graphScale;
             for (int n = 0; n < pointGraph.size() - 1; n++) {
                 int i = (int) (n * multiplier2);
                 renderer.setColor(Color.YELLOW);
-                renderer.line(i - WIDTH / 2f, pointGraph.get(n).x * 10 - 25 + HEIGHT / 2f, i + multiplier2 - WIDTH / 2f, pointGraph.get(n + 1).x * 10 - 25 + HEIGHT / 2f);
+                renderer.line(i - WIDTH / 2f, pointGraph.get(n).x / maxUpperGraphAmplitude * 15 - 30 + HEIGHT / 2f, i + multiplier2 - WIDTH / 2f, pointGraph.get(n + 1).x / maxUpperGraphAmplitude * 15 - 30 + HEIGHT / 2f);
                 renderer.setColor(Color.CYAN);
-                renderer.line(i - WIDTH / 2f, pointGraph.get(n).y * 10 - 25 + HEIGHT / 2f, i + multiplier2 - WIDTH / 2f, pointGraph.get(n + 1).y * 10 - 25 + HEIGHT / 2f);
+                renderer.line(i - WIDTH / 2f, pointGraph.get(n).y / maxUpperGraphAmplitude * 15 - 30 + HEIGHT / 2f, i + multiplier2 - WIDTH / 2f, pointGraph.get(n + 1).y / maxUpperGraphAmplitude * 15 - 30 + HEIGHT / 2f);
                 renderer.setColor(Color.MAGENTA);
-                renderer.line(i - WIDTH / 2f, pointGraph.get(n).z * 10 - 25 + HEIGHT / 2f, i + multiplier2 - WIDTH / 2f, pointGraph.get(n + 1).z * 10 - 25 + HEIGHT / 2f);
+                renderer.line(i - WIDTH / 2f, pointGraph.get(n).z / maxUpperGraphAmplitude * 15 - 30 + HEIGHT / 2f, i + multiplier2 - WIDTH / 2f, pointGraph.get(n + 1).z / maxUpperGraphAmplitude * 15 - 30 + HEIGHT / 2f);
+                maxUpperGraphAmplitude = max(maxUpperGraphAmplitude, abs(pointGraph.get(n).x));
+                maxUpperGraphAmplitude = max(maxUpperGraphAmplitude, abs(pointGraph.get(n).y));
+                maxUpperGraphAmplitude = max(maxUpperGraphAmplitude, abs(pointGraph.get(n).z));
             }
+            renderer.setColor(Color.YELLOW);
+            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, points.get(0).points, "x");
+            renderer.setColor(Color.CYAN);
+            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, points.get(0).points, "y");
+            renderer.setColor(Color.MAGENTA);
+            render2DGraph(0, 0, WIDTH / 2f, HEIGHT / 2f, points.get(0).points, "z");
             renderer.end();
             
             batch.begin();
@@ -300,8 +328,55 @@ public class SimulationScreen implements Screen {
             stage.act(delta);
             batch.end();
         }
-        
-        
+    }
+    
+    void render2DGraph(float x, float y, float width, float height, Array<Vector3> points_orig, String ignore) {
+        Array<Vector3> points = new Array<>();
+        for (int i = 0; i < points_orig.size; i++) {
+            points.add(new Vector3(points_orig.get(i)));
+        }
+        float minTargetSize = min(width, height);
+        for (int i = 0; i < points.size; i++) {
+            Vector3 point = points.get(i);
+            max2DGraphAmplitude = max(max2DGraphAmplitude, abs(point.x));
+            max2DGraphAmplitude = max(max2DGraphAmplitude, abs(point.y));
+            max2DGraphAmplitude = max(max2DGraphAmplitude, abs(point.z));
+        }
+        for (int i = 0; i < points.size; i++) {
+            points.get(i).x /= max2DGraphAmplitude;
+            points.get(i).y /= max2DGraphAmplitude;
+            points.get(i).z /= max2DGraphAmplitude;
+        }
+        for (int i = 0; i < points.size; i++) {
+            Vector3 point = points.get(i);
+            switch (ignore) {
+                case ("x"):
+                    point.y *= minTargetSize;
+                    point.z *= minTargetSize;
+                    break;
+                case ("y"):
+                    point.x *= minTargetSize;
+                    point.z *= minTargetSize;
+                    break;
+                case ("z"):
+                    point.x *= minTargetSize;
+                    point.y *= minTargetSize;
+                    break;
+            }
+        }
+        for (int i = 0; i < points.size - 1; i++) {
+            switch (ignore) {
+                case ("x"):
+                    renderer.line(x + points.get(i).y, y + points.get(i).z, x + points.get(i + 1).y, y + points.get(i + 1).z);
+                    break;
+                case ("y"):
+                    renderer.line(x + points.get(i).x, y + points.get(i).z, x + points.get(i + 1).x, y + points.get(i + 1).z);
+                    break;
+                case ("z"):
+                    renderer.line(x + points.get(i).x, y + points.get(i).y, x + points.get(i + 1).x, y + points.get(i + 1).y);
+                    break;
+            }
+        }
     }
     
     @Override

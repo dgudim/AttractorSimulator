@@ -15,12 +15,16 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.deo.attractor.Utils.MathExpression;
 
+import java.util.Vector;
+
 import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
 
 public class Point {
     
     private final ModelBuilder modelBuilder;
+    
+    Vector3 startingPosition;
     
     Array<Vector3> points;
     Array<Model> models;
@@ -43,6 +47,7 @@ public class Point {
     
     Point(Vector3 startingPoint, Color[] palette, MathExpression[] simRules, float maxTimestep, float scale) {
         
+        startingPosition = startingPoint;
         this.simRules = simRules;
         this.maxTimestep = maxTimestep;
         this.scale = scale;
@@ -61,6 +66,14 @@ public class Point {
     
     void setTimestep(float newTimestep) {
         currentTimestep = min(newTimestep, maxTimestep);
+    }
+    
+    void reset(){
+        points.clear();
+        colors.clear();
+        models.clear();
+        instances.clear();
+        init(startingPosition);
     }
     
     void init(Vector3 startingPoint) {
