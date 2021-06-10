@@ -14,7 +14,7 @@ public class DesktopLauncher {
 		config.foregroundFPS = 60;
 		config.width = WIDTH;
 		config.height = HEIGHT;
-		config.fullscreen = false;
+		config.fullscreen = true;
 		config.resizable = true;
 		
 		new LwjglApplication(new Launcher(), config);

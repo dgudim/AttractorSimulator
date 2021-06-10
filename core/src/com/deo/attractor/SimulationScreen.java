@@ -4,10 +4,13 @@ import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
@@ -28,6 +31,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.BufferUtils;
+import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.deo.attractor.Utils.MathExpression;
 
@@ -56,9 +61,12 @@ public class SimulationScreen implements Screen {
     private final ModelBatch modelBatch;
     private final Environment environment;
     
+    boolean recording = true;
+    int frame = 0;
+    
     float spread = 2;
     int attractorType = 2;
-    int numberOfPoints = 70;
+    int numberOfPoints = 500;
     boolean settingsMode = false;
     float currentTimeStep;
     
@@ -194,7 +202,7 @@ public class SimulationScreen implements Screen {
                     (float) (random() * spread),
                     (float) (random() * spread),
                     (float) (random() * spread)),
-                    availablePalettes[4], simRules, maxTimestep, scale));
+                    availablePalettes[1], simRules, maxTimestep, scale));
         }
         
         cam = new PerspectiveCamera(67, WIDTH, HEIGHT);
@@ -228,8 +236,10 @@ public class SimulationScreen implements Screen {
     @Override
     public void render(float delta) {
         
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+        if (!Gdx.input.isKeyPressed(Input.Keys.H)) {
+            Gdx.gl.glClearColor(0, 0, 0, 1);
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+        }
         
         cameraInputController.update();
         
@@ -243,9 +253,20 @@ public class SimulationScreen implements Screen {
         
         modelBatch.end();
         
-        for (int n = 0; n < 1 / currentTimeStep / 50f; n++) {
+        if (recording) {
+            makeAScreenShot(frame);
+            frame++;
+        }
+        
+        if (recording) {
             for (int i = 0; i < points.size; i++) {
                 points.get(i).advance();
+            }
+        } else {
+            for (int n = 0; n < 1 / currentTimeStep / 50f; n++) {
+                for (int i = 0; i < points.size; i++) {
+                    points.get(i).advance();
+                }
             }
         }
         
@@ -266,11 +287,16 @@ public class SimulationScreen implements Screen {
             maxBottomGraphAmplitude = 1;
             max2DGraphAmplitude = 1;
         }
-    
+        
         if (Gdx.input.isKeyJustPressed(Input.Keys.T)) {
-            for(int i = 0; i<points.size; i++){
+            for (int i = 0; i < points.size; i++) {
                 points.get(i).reset();
             }
+        }
+        
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            recording = !recording;
+            frame = 0;
         }
         
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
@@ -284,7 +310,6 @@ public class SimulationScreen implements Screen {
         
         if (settingsMode) {
             batch.setProjectionMatrix(camera.combined);
-            
             renderer.setProjectionMatrix(camera.combined);
             renderer.begin();
             float multiplier = WIDTH / (float) numberOfPoints;
@@ -413,5 +438,20 @@ public class SimulationScreen implements Screen {
             points.get(i).dispose();
         }
         points.clear();
+    }
+    
+    public void makeAScreenShot(int recorderFrame) {
+        
+        byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), true);
+        
+        for (int i4 = 4; i4 < pixels.length; i4 += 4) {
+            pixels[i4 - 1] = (byte) 255;
+        }
+        
+        FileHandle file = Gdx.files.external("GollyRender/pict" + recorderFrame + ".png");
+        Pixmap pixmap = new Pixmap(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), Pixmap.Format.RGBA8888);
+        BufferUtils.copy(pixels, 0, pixmap.getPixels(), pixels.length);
+        PixmapIO.writePNG(file, pixmap);
+        pixmap.dispose();
     }
 }
