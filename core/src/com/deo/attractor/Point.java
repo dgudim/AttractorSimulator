@@ -1,23 +1,9 @@
 package com.deo.attractor;
 
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.g3d.Environment;
-import com.badlogic.gdx.graphics.g3d.Material;
-import com.badlogic.gdx.graphics.g3d.Model;
-import com.badlogic.gdx.graphics.g3d.ModelBatch;
-import com.badlogic.gdx.graphics.g3d.ModelInstance;
-import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute;
-import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
-import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.deo.attractor.Utils.MathExpression;
-
-import java.util.ArrayList;
-
-import static java.lang.StrictMath.max;
-import static java.lang.StrictMath.min;
 
 public class Point {
     
@@ -47,8 +33,9 @@ public class Point {
     }
     
     void reset() {
-        points.clear();
-        init(startingPosition);
+        for (int i = 0; i < maxPoints; i++) {
+            points.set(i, startingPosition);
+        }
     }
     
     void init(Vector3 startingPoint) {
@@ -66,12 +53,6 @@ public class Point {
     void advance() {
         shift();
         points.set(points.size - 1, calculateNextPosition(points.get(points.size - 1)));
-    }
-    
-    void resetTrail() {
-        Vector3 prevPos = points.get(points.size - 1);
-        points.clear();
-        init(prevPos);
     }
     
     Vector3 calculateNextPosition(Vector3 position) {
