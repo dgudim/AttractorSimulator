@@ -8,7 +8,21 @@ import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.utils.BufferUtils;
 import com.badlogic.gdx.utils.ScreenUtils;
 
+import java.util.ArrayList;
+
+import static java.lang.StrictMath.PI;
+import static java.lang.StrictMath.sin;
+
 public class Utils {
+    
+    public final static String fontChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890\"!`?'.,;:()[]{}<>|/@\\^$€-%+=#_&~*ёйцукенгшщзхъэждлорпавыфячсмитьбюЁЙЦУКЕНГШЩЗХЪЭЖДЛОРПАВЫФЯЧСМИТЬБЮ";
+    
+    public static Color[][] availablePalettes = new Color[][]{
+            {Color.CLEAR, Color.ORANGE, Color.CYAN, Color.CORAL},
+            {Color.CLEAR, Color.valueOf("#662341"), Color.valueOf("#ffe240"), Color.FIREBRICK},
+            {Color.CLEAR, Color.ORANGE, Color.RED, Color.GRAY},
+            {Color.CLEAR, Color.LIME, Color.TEAL, Color.CLEAR},
+            {Color.CLEAR, Color.SKY, Color.SKY, Color.CLEAR, Color.CLEAR, Color.TEAL, Color.TEAL, Color.CLEAR}};
     
     public static int interpolate(float step, float maxValue, Color... colors) {
         step = Math.max(Math.min(step / maxValue, 1.0f), 0.0f);
@@ -61,6 +75,15 @@ public class Utils {
         BufferUtils.copy(pixels, 0, pixmap.getPixels(), pixels.length);
         PixmapIO.writePNG(file, pixmap);
         pixmap.dispose();
+    }
+    
+    public static ArrayList<Float> generateSine(int sampleRate, float frequency, float duration) {
+        ArrayList<Float> samples = new ArrayList<>();
+        double period = PI * 2;
+        for (double i = 0; i < period * duration; i += period / (double) sampleRate) {
+            samples.add((float) sin(i * frequency));
+        }
+        return samples;
     }
     
 }

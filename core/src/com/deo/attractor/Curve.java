@@ -5,7 +5,7 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.deo.attractor.Utils.MathExpression;
 
-public class Point {
+public class Curve {
     
     Vector3 startingPosition;
     
@@ -13,18 +13,16 @@ public class Point {
     Array<Color> colors;
     
     int maxPoints;
-    float currentTimestep;
-    float scale;
+    float timestep;
     
     MathExpression[] simRules;
     
-    Point(Vector3 startingPoint, MathExpression[] simRules, float timeStep, float scale, int maxPoints) {
+    Curve(Vector3 startingPoint, MathExpression[] simRules, float timeStep, int maxPoints) {
         
         startingPosition = startingPoint;
         this.simRules = simRules;
-        this.scale = scale;
         this.maxPoints = maxPoints;
-        currentTimestep = timeStep;
+        timestep = timeStep;
         
         points = new Array<>();
         colors = new Array<>();
@@ -59,9 +57,9 @@ public class Point {
         float dX = (float) simRules[0].evaluateExp(position.x, position.y, position.z);
         float dY = (float) simRules[1].evaluateExp(position.x, position.y, position.z);
         float dZ = (float) simRules[2].evaluateExp(position.x, position.y, position.z);
-        dX *= currentTimestep;
-        dY *= currentTimestep;
-        dZ *= currentTimestep;
+        dX *= timestep;
+        dY *= timestep;
+        dZ *= timestep;
         return new Vector3(position.x + dX, position.y + dY, position.z + dZ);
     }
 }
