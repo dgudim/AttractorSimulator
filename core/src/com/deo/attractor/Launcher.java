@@ -9,7 +9,7 @@ public final class Launcher extends Game {
 
     @Override
     public void create() {
-        this.setScreen(new SimulationScreen(this));
+        this.setScreen(new SimulationScreen());
     }
 
     @Override

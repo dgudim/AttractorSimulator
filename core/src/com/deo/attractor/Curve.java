@@ -25,7 +25,6 @@ public class Curve {
         timestep = timeStep;
         
         points = new Array<>();
-        colors = new Array<>();
         
         init(startingPoint);
     }
@@ -43,14 +42,23 @@ public class Curve {
     }
     
     private void shift() {
-        for (int i = 0; i < points.size - 1; i++) {
+        for (int i = 0; i < maxPoints - 1; i++) {
             points.set(i, points.get(i + 1));
         }
     }
     
     void advance() {
         shift();
-        points.set(points.size - 1, calculateNextPosition(points.get(points.size - 1)));
+        points.set(maxPoints - 1, calculateNextPosition(points.get(maxPoints - 1)));
+    }
+    
+    void setMaxPoints(int maxPoints) {
+        if (maxPoints > this.maxPoints) {
+            for (int i = 0; i < maxPoints - this.maxPoints; i++) {
+                points.add(points.get(this.maxPoints - 1));
+            }
+        }
+        this.maxPoints = maxPoints;
     }
     
     Vector3 calculateNextPosition(Vector3 position) {

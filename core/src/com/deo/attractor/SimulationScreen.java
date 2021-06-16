@@ -1,10 +1,8 @@
 package com.deo.attractor;
 
-import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
-import com.badlogic.gdx.audio.AudioDevice;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -15,7 +13,6 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g3d.utils.CameraInputController;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -25,21 +22,18 @@ import com.badlogic.gdx.scenes.scene2d.ui.Slider;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.deo.attractor.Utils.MathExpression;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
+import static com.badlogic.gdx.math.MathUtils.clamp;
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
 import static com.deo.attractor.Utils.Utils.fontChars;
-import static com.deo.attractor.Utils.Utils.interpolate;
 import static com.deo.attractor.Utils.Utils.makeAScreenShot;
-import static java.lang.StrictMath.PI;
 import static java.lang.StrictMath.abs;
-import static java.lang.StrictMath.max;
-import static java.lang.StrictMath.sin;
 
 public class SimulationScreen implements Screen {
     
@@ -54,24 +48,33 @@ public class SimulationScreen implements Screen {
     BitmapFont font;
     ShapeRenderer renderer;
     
+    boolean rendering = false;
+    volatile boolean[] renderThreadsFinished;
+    volatile float[] renderThreadsProgress;
     boolean recording = false;
     int frame = 0;
+    
+    final int renderPointsPerCurve = 100000;
     
     Attractor attractor;
     
     int palette = 1;
     int attractorType = 0;
-    int numberOfCurves = 70;
+    int numberOfCurves = 15;
     int pointsPerCurve = 1000;
+    float spread = 1;
     boolean settingsMode = false;
-    
-    private Game game;
+    boolean pointRender = false;
+    boolean hsvColoring = false;
+    boolean speedColoring = false;
+    float coloringScale = 1;
     
     private final CameraInputController cameraInputController;
     
-    SimulationScreen(Game game) {
+    SimulationScreen() {
         
-        this.game = game;
+        renderThreadsFinished = new boolean[numberOfCurves];
+        renderThreadsProgress = new float[numberOfCurves];
         
         camera = new OrthographicCamera(WIDTH, HEIGHT);
         viewport_2d = new ScreenViewport(camera);
@@ -100,9 +103,9 @@ public class SimulationScreen implements Screen {
         generator.dispose();
         font.getData().markupEnabled = true;
         
-        attractor = new Attractor(attractorType, numberOfCurves, pointsPerCurve, palette);
+        attractor = new Attractor(attractorType, numberOfCurves, pointsPerCurve, palette, spread);
         String[] constants = attractor.constants;
-        final MathExpression[] simRules = attractor.simRules;
+        final ArrayList<MathExpression[]> simRules = attractor.simRules;
         
         for (int i = 0; i < constants.length; i++) {
             final String[] vals = constants[i].replace(" ", "").split("=");
@@ -122,8 +125,10 @@ public class SimulationScreen implements Screen {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
                     valueText.setText(vals[0] + ":" + parameterSlider.getValue());
-                    for (MathExpression expression : simRules) {
-                        expression.changeConstant(finalI, parameterSlider.getValue());
+                    for (MathExpression[] expressions : simRules) {
+                        for (MathExpression expression : expressions) {
+                            expression.changeConstant(finalI, parameterSlider.getValue());
+                        }
                     }
                 }
             });
@@ -135,6 +140,24 @@ public class SimulationScreen implements Screen {
             holder.setBounds(0, i * 60 - HEIGHT / 2f + 25, 550, 25);
             stage.addActor(holder);
         }
+        
+        final Slider pointsPerCurveSlider = new Slider(1, pointsPerCurve * 10, 1, false, sliderStyle);
+        pointsPerCurveSlider.setValue(pointsPerCurve);
+        final Label pointPerCurveText = new Label("points per curve:" + pointsPerCurve, new LabelStyle(font, Color.WHITE));
+        pointsPerCurveSlider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                pointsPerCurve = (int) pointsPerCurveSlider.getValue();
+                pointPerCurveText.setText("points per curve:" + pointsPerCurve);
+                attractor.setPointsPerCurve(pointsPerCurve);
+            }
+        });
+        Table holder = new Table();
+        holder.add(pointPerCurveText);
+        holder.add(pointsPerCurveSlider).size(WIDTH - pointPerCurveText.getPrefWidth(), 25);
+        holder.align(Align.right);
+        holder.setBounds(-WIDTH / 2f + 15, HEIGHT / 2f - 35, WIDTH, 25);
+        stage.addActor(holder);
         
         cam = new PerspectiveCamera(67, WIDTH, HEIGHT);
         cam.position.set(10f, 10f, 10f);
@@ -164,31 +187,45 @@ public class SimulationScreen implements Screen {
             Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         }
         
+        processButtonPresses(delta);
+        
         cameraInputController.update();
+        attractor.render(renderer, cam, speedColoring, hsvColoring, coloringScale, pointRender);
         
-        attractor.render(renderer, cam, false, 0);
+        if (rendering) {
+            renderer.setProjectionMatrix(camera.combined);
+            renderer.begin(ShapeRenderer.ShapeType.Filled);
+            float progressBarHeight = clamp(HEIGHT / (float) numberOfCurves, 1, 35);
+            for (int i = 0; i < numberOfCurves; i++) {
+                renderer.setColor(Color.WHITE);
+                renderer.rect(-WIDTH / 2f, -HEIGHT / 2f + (progressBarHeight + 5) * i, 340, progressBarHeight);
+                renderer.setColor(Color.FOREST);
+                renderer.rect(-WIDTH / 2f + 1, -HEIGHT / 2f + (progressBarHeight + 5) * i + 1, 338 * renderThreadsProgress[i], progressBarHeight - 2);
+            }
+            renderer.end();
+            
+            boolean finished = true;
+            for (int i = 0; i < numberOfCurves; i++) {
+                if (!renderThreadsFinished[i]) {
+                    finished = false;
+                    break;
+                }
+            }
+            if (finished) {
+                rendering = false;
+                Arrays.fill(renderThreadsFinished, false);
+                Arrays.fill(renderThreadsProgress, 0);
+            }
+        }
         
-        if (recording) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ALT_RIGHT)) {
             makeAScreenShot(frame);
             frame++;
         }
         
-        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
-            attractor.reset();
-        }
-        
-        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
-            recording = !recording;
-            frame = 0;
-        }
-        
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            settingsMode = !settingsMode;
-            if (settingsMode) {
-                Gdx.input.setInputProcessor(stage);
-            } else {
-                Gdx.input.setInputProcessor(cameraInputController);
-            }
+        if (recording) {
+            makeAScreenShot(frame);
+            frame++;
         }
         
         if (settingsMode) {
@@ -198,11 +235,64 @@ public class SimulationScreen implements Screen {
             stage.act(delta);
             batch.end();
         }
+    }
     
+    void processButtonPresses(float delta) {
         if (Gdx.input.isKeyJustPressed(Input.Keys.L)) {
-            game.setScreen(new RenderScreen(attractor, game, this));
+            if (!rendering) {
+                rendering = true;
+                while (!attractor.threadComputeCycleFinished) {
+                    System.out.println("Thread cycle not finished, waiting");
+                }
+                attractor.setPointsPerCurve(renderPointsPerCurve);
+                for (int i = 0; i < attractor.curves.size; i++) {
+                    attractor.curves.get(i).reset();
+                }
+                for (int i = 0; i < attractor.curves.size; i++) {
+                    final int finalI = i;
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (int i = 0; i < renderPointsPerCurve; i++) {
+                                attractor.curves.get(finalI).advance();
+                                renderThreadsProgress[finalI] = i/(float)renderPointsPerCurve;
+                            }
+                            renderThreadsFinished[finalI] = true;
+                        }
+                    }).start();
+                }
+            }
         }
-        
+        if (Gdx.input.isKeyPressed(Input.Keys.F2)) {
+            coloringScale += delta / 10f;
+        }
+        if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
+            coloringScale -= delta / 10f;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F3)) {
+            hsvColoring = !hsvColoring;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F4)) {
+            pointRender = !pointRender;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F5)) {
+            speedColoring = !speedColoring;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            attractor.reset();
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            recording = !recording;
+            frame = 0;
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            settingsMode = !settingsMode;
+            if (settingsMode) {
+                Gdx.input.setInputProcessor(stage);
+            } else {
+                Gdx.input.setInputProcessor(cameraInputController);
+            }
+        }
     }
     
     @Override
