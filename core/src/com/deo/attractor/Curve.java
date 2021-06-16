@@ -1,6 +1,6 @@
 package com.deo.attractor;
 
-import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.deo.attractor.Utils.MathExpression;
@@ -10,7 +10,6 @@ public class Curve {
     Vector3 startingPosition;
     
     Array<Vector3> points;
-    Array<Color> colors;
     
     int maxPoints;
     float timestep;
@@ -69,5 +68,22 @@ public class Curve {
         dY *= timestep;
         dZ *= timestep;
         return new Vector3(position.x + dX, position.y + dY, position.z + dZ);
+    }
+    
+    public void saveToFile(FileHandle saveTo) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < maxPoints; i++) {
+            builder.append(points.get(i).x).append(",").append(points.get(i).y).append(",").append(points.get(i).z);
+            builder.append("\n");
+        }
+        saveTo.writeString(builder.substring(0, builder.toString().length() - 1), false);
+    }
+    
+    public void loadFromFile(FileHandle loadFrom) {
+        String[] points = loadFrom.readString().split("\n");
+        for (int i = 0; i < maxPoints; i++) {
+            String[] xyz = points[i].split(",");
+            this.points.set(i, new Vector3(Float.parseFloat(xyz[0]), Float.parseFloat(xyz[1]), Float.parseFloat(xyz[2])));
+        }
     }
 }

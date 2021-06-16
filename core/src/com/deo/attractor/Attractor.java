@@ -3,6 +3,7 @@ package com.deo.attractor;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.audio.AudioDevice;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
@@ -17,6 +18,7 @@ import static com.badlogic.gdx.math.MathUtils.clamp;
 import static com.deo.attractor.Utils.Utils.availablePalettes;
 import static com.deo.attractor.Utils.Utils.generateSine;
 import static com.deo.attractor.Utils.Utils.interpolate;
+import static java.lang.StrictMath.min;
 import static java.lang.StrictMath.random;
 import static java.lang.StrictMath.sqrt;
 
@@ -28,6 +30,7 @@ public class Attractor {
     String[] constants;
     
     float scale = 1;
+    int attractorType;
     
     int palette;
     
@@ -41,8 +44,12 @@ public class Attractor {
     volatile boolean threadActive = true;
     volatile boolean threadComputeCycleFinished = false;
     
+    final String rootDir = "AttractorSim\\saves\\" + attractorType + "\\";
+    FileHandle generalSettingsFile = Gdx.files.external(rootDir + "settings.txt");
+    
     Attractor(int attractorType, int numberOfCurves, int pointsPerCurve, int palette, float spread) {
         
+        this.attractorType = attractorType;
         this.palette = palette;
         this.pointsPerCurve = pointsPerCurve;
         
@@ -120,6 +127,8 @@ public class Attractor {
         for (int i = 0; i < pointsPerCurve; i++) {
             colors.add(new Color(interpolate(i, pointsPerCurve, availablePalettes[palette])));
         }
+        
+        loadState();
         
         new Thread(new Runnable() {
             @Override
@@ -221,5 +230,26 @@ public class Attractor {
     
     void reset() {
         resetInTheNextIteration = true;
+    }
+    
+    public void saveState() {
+        generalSettingsFile.writeString(curves.size + "\n" + pointsPerCurve, false);
+        for (int i = 0; i < curves.size; i++) {
+            FileHandle saveTo = Gdx.files.external(rootDir + "curve" + i + ".txt");
+            curves.get(i).saveToFile(saveTo);
+        }
+    }
+    
+    void loadState() {
+        if (Gdx.files.external(rootDir + "curve0.txt").exists()) {
+            String[] settings = generalSettingsFile.readString().split("\n");
+            int curves = Integer.parseInt(settings[0]);
+            int pointsPerCurve = Integer.parseInt(settings[1]);
+            setPointsPerCurve(pointsPerCurve);
+            for (int i = 0; i < min(curves, this.curves.size); i++) {
+                FileHandle loadFrom = Gdx.files.external(rootDir + "curve" + i + ".txt");
+                this.curves.get(i).loadFromFile(loadFrom);
+            }
+        }
     }
 }

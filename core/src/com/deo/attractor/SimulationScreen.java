@@ -213,6 +213,7 @@ public class SimulationScreen implements Screen {
             }
             if (finished) {
                 rendering = false;
+                attractor.threadActive = true;
                 Arrays.fill(renderThreadsFinished, false);
                 Arrays.fill(renderThreadsProgress, 0);
             }
@@ -241,6 +242,7 @@ public class SimulationScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.L)) {
             if (!rendering) {
                 rendering = true;
+                attractor.threadActive = false;
                 while (!attractor.threadComputeCycleFinished) {
                     System.out.println("Thread cycle not finished, waiting");
                 }
@@ -262,6 +264,14 @@ public class SimulationScreen implements Screen {
                     }).start();
                 }
             }
+        }
+        if (Gdx.input.isKeyPressed(Input.Keys.ESCAPE)) {
+            attractor.threadActive = false;
+            while (!attractor.threadComputeCycleFinished) {
+                System.out.println("Thread cycle not finished, waiting");
+            }
+            attractor.saveState();
+            System.exit(0);
         }
         if (Gdx.input.isKeyPressed(Input.Keys.F2)) {
             coloringScale += delta / 10f;
