@@ -1,4 +1,4 @@
-package com.deo.attractor;
+package com.deo.attractor.Attractors;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -22,10 +22,10 @@ import static java.lang.StrictMath.min;
 import static java.lang.StrictMath.random;
 import static java.lang.StrictMath.sqrt;
 
-public class Attractor {
+public class Attractor3D {
     
     ArrayList<MathExpression[]> simRules;
-    final Array<Curve> curves;
+    final Array<Curve3D> curves;
     private int pointsPerCurve;
     String[] constants;
     
@@ -44,10 +44,13 @@ public class Attractor {
     volatile boolean threadActive = true;
     volatile boolean threadComputeCycleFinished = false;
     
-    final String rootDir = "AttractorSim\\saves\\" + attractorType + "\\";
-    FileHandle generalSettingsFile = Gdx.files.external(rootDir + "settings.txt");
+    String rootDir;
+    FileHandle generalSettingsFile;
     
-    Attractor(int attractorType, int numberOfCurves, int pointsPerCurve, int palette, float spread) {
+    Attractor3D(int attractorType, int numberOfCurves, int pointsPerCurve, int palette, float spread) {
+    
+        rootDir = "AttractorSim\\saves\\" + attractorType + "\\";
+        generalSettingsFile = Gdx.files.external(rootDir + "settings.txt");
         
         this.attractorType = attractorType;
         this.palette = palette;
@@ -78,11 +81,16 @@ public class Attractor {
                 scale = 5;
                 break;
             case (4):
-            default:
                 constants = new String[]{"t = 1", "a = 0.7", "b = 3.5", "c = 0.95", "d = 0.25", "f = 0.1", "k = 0.6"};
                 maxTimestep = 0.002f;
                 scale = 4;
                 break;
+            case (5):
+            default:
+                constants = new String[]{"t = 1", "a = 5", "b = -10", "c = -0.38"};
+                maxTimestep = 0.0005f;
+                scale = 0.5f;
+                spread = 3;
         }
         
         curves = new Array<>();
@@ -110,13 +118,19 @@ public class Attractor {
                     simRules_local[2] = new MathExpression("(x * x - a * z)*t", bulkArgs, constants);
                     break;
                 case (4):
-                default:
                     simRules_local[0] = new MathExpression("((z - a) * x - b * y)*t", bulkArgs, constants);
                     simRules_local[1] = new MathExpression("(b * x + (z - a) * y)*t", bulkArgs, constants);
                     simRules_local[2] = new MathExpression("(k + c * z - (z * z * z) / 3 - (x * x + y * y) * (1 + d * z) + f * z * x * x * x)*t", bulkArgs, constants);
                     break;
+                case (5):
+                default:
+                    simRules_local[0] = new MathExpression("(a * x - y * z)*t", bulkArgs, constants);
+                    simRules_local[1] = new MathExpression("(b * y + x * z)*t", bulkArgs, constants);
+                    simRules_local[2] = new MathExpression("(c * z + x * y / 3)*t", bulkArgs, constants);
+    
             }
-            curves.add(new Curve(new Vector3(
+            simRules.add(simRules_local);
+            curves.add(new Curve3D(new Vector3(
                     (float) (random() * spread),
                     (float) (random() * spread),
                     (float) (random() * spread)),
@@ -204,7 +218,7 @@ public class Attractor {
                     float dz = clamp(Math.abs(nextPos.z - pos.z) * speedColoringScale, 0, 1);
                     if (hsv) {
                         float dist = (float) sqrt(dx * dx + dy * dy + dz * dz);
-                        renderer.setColor(new Color().fromHsv(dist * 180, 0.5f, 1).add(0, 0, 0, clamp(dist / 2f, 0, 0.7f)));
+                        renderer.setColor(new Color().fromHsv(dist * 180, 0.5f, 1).add(0, 0, 0, clamp(dist / 4f * scale, 0, 0.7f)));
                     } else {
                         renderer.setColor(new Color(1 - dx, 1 - dy, 1 - dz, (dx + dy + dz) / 3f));
                     }

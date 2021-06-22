@@ -1,4 +1,4 @@
-package com.deo.attractor;
+package com.deo.attractor.Attractors;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -34,8 +34,9 @@ import static com.deo.attractor.Launcher.WIDTH;
 import static com.deo.attractor.Utils.Utils.fontChars;
 import static com.deo.attractor.Utils.Utils.makeAScreenShot;
 import static java.lang.StrictMath.abs;
+import static java.lang.StrictMath.random;
 
-public class SimulationScreen implements Screen {
+public class SimulationScreen3D implements Screen {
     
     private final PerspectiveCamera cam;
     private final OrthographicCamera camera;
@@ -56,9 +57,9 @@ public class SimulationScreen implements Screen {
     
     final int renderPointsPerCurve = 100000;
     
-    Attractor attractor;
+    Attractor3D attractor3D;
     
-    int palette = 1;
+    int palette = 0;
     int attractorType = 0;
     int numberOfCurves = 15;
     int pointsPerCurve = 1000;
@@ -71,7 +72,7 @@ public class SimulationScreen implements Screen {
     
     private final CameraInputController cameraInputController;
     
-    SimulationScreen() {
+    public SimulationScreen3D() {
         
         renderThreadsFinished = new boolean[numberOfCurves];
         renderThreadsProgress = new float[numberOfCurves];
@@ -103,9 +104,9 @@ public class SimulationScreen implements Screen {
         generator.dispose();
         font.getData().markupEnabled = true;
         
-        attractor = new Attractor(attractorType, numberOfCurves, pointsPerCurve, palette, spread);
-        String[] constants = attractor.constants;
-        final ArrayList<MathExpression[]> simRules = attractor.simRules;
+        attractor3D = new Attractor3D(attractorType, numberOfCurves, pointsPerCurve, palette, spread);
+        String[] constants = attractor3D.constants;
+        final ArrayList<MathExpression[]> simRules = attractor3D.simRules;
         
         for (int i = 0; i < constants.length; i++) {
             final String[] vals = constants[i].replace(" ", "").split("=");
@@ -149,7 +150,7 @@ public class SimulationScreen implements Screen {
             public void changed(ChangeEvent event, Actor actor) {
                 pointsPerCurve = (int) pointsPerCurveSlider.getValue();
                 pointPerCurveText.setText("points per curve:" + pointsPerCurve);
-                attractor.setPointsPerCurve(pointsPerCurve);
+                attractor3D.setPointsPerCurve(pointsPerCurve);
             }
         });
         Table holder = new Table();
@@ -190,7 +191,7 @@ public class SimulationScreen implements Screen {
         processButtonPresses(delta);
         
         cameraInputController.update();
-        attractor.render(renderer, cam, speedColoring, hsvColoring, coloringScale, pointRender);
+        attractor3D.render(renderer, cam, speedColoring, hsvColoring, coloringScale * attractor3D.scale, pointRender);
         
         if (rendering) {
             renderer.setProjectionMatrix(camera.combined);
@@ -199,7 +200,10 @@ public class SimulationScreen implements Screen {
             for (int i = 0; i < numberOfCurves; i++) {
                 renderer.setColor(Color.WHITE);
                 renderer.rect(-WIDTH / 2f, -HEIGHT / 2f + (progressBarHeight + 5) * i, 340, progressBarHeight);
-                renderer.setColor(Color.FOREST);
+                renderer.setColor(Color.GOLDENROD);
+                if (renderThreadsProgress[i] >= 0.99f) {
+                    renderer.setColor(Color.FOREST);
+                }
                 renderer.rect(-WIDTH / 2f + 1, -HEIGHT / 2f + (progressBarHeight + 5) * i + 1, 338 * renderThreadsProgress[i], progressBarHeight - 2);
             }
             renderer.end();
@@ -213,14 +217,14 @@ public class SimulationScreen implements Screen {
             }
             if (finished) {
                 rendering = false;
-                attractor.threadActive = true;
+                attractor3D.threadActive = true;
                 Arrays.fill(renderThreadsFinished, false);
                 Arrays.fill(renderThreadsProgress, 0);
             }
         }
         
         if (Gdx.input.isKeyJustPressed(Input.Keys.ALT_RIGHT)) {
-            makeAScreenShot(frame);
+            makeAScreenShot("Attractor3D" + frame + "_" + random());
             frame++;
         }
         
@@ -242,22 +246,22 @@ public class SimulationScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.L)) {
             if (!rendering) {
                 rendering = true;
-                attractor.threadActive = false;
-                while (!attractor.threadComputeCycleFinished) {
+                attractor3D.threadActive = false;
+                while (!attractor3D.threadComputeCycleFinished) {
                     System.out.println("Thread cycle not finished, waiting");
                 }
-                attractor.setPointsPerCurve(renderPointsPerCurve);
-                for (int i = 0; i < attractor.curves.size; i++) {
-                    attractor.curves.get(i).reset();
+                attractor3D.setPointsPerCurve(renderPointsPerCurve);
+                for (int i = 0; i < attractor3D.curves.size; i++) {
+                    attractor3D.curves.get(i).reset();
                 }
-                for (int i = 0; i < attractor.curves.size; i++) {
+                for (int i = 0; i < attractor3D.curves.size; i++) {
                     final int finalI = i;
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
                             for (int i = 0; i < renderPointsPerCurve; i++) {
-                                attractor.curves.get(finalI).advance();
-                                renderThreadsProgress[finalI] = i/(float)renderPointsPerCurve;
+                                attractor3D.curves.get(finalI).advance();
+                                renderThreadsProgress[finalI] = i / (float) renderPointsPerCurve;
                             }
                             renderThreadsFinished[finalI] = true;
                         }
@@ -266,11 +270,11 @@ public class SimulationScreen implements Screen {
             }
         }
         if (Gdx.input.isKeyPressed(Input.Keys.ESCAPE)) {
-            attractor.threadActive = false;
-            while (!attractor.threadComputeCycleFinished) {
+            attractor3D.threadActive = false;
+            while (!attractor3D.threadComputeCycleFinished) {
                 System.out.println("Thread cycle not finished, waiting");
             }
-            attractor.saveState();
+            attractor3D.saveState();
             System.exit(0);
         }
         if (Gdx.input.isKeyPressed(Input.Keys.F2)) {
@@ -289,7 +293,7 @@ public class SimulationScreen implements Screen {
             speedColoring = !speedColoring;
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
-            attractor.reset();
+            attractor3D.reset();
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
             recording = !recording;

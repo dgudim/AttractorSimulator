@@ -24,7 +24,7 @@ public class Utils {
             {Color.CLEAR, Color.LIME, Color.TEAL, Color.CLEAR},
             {Color.CLEAR, Color.SKY, Color.SKY, Color.CLEAR, Color.CLEAR, Color.TEAL, Color.TEAL, Color.CLEAR}};
     
-    public static int interpolate(float step, float maxValue, Color... colors) {
+    public static int interpolate(double step, double maxValue, Color... colors) {
         step = Math.max(Math.min(step / maxValue, 1.0f), 0.0f);
         
         switch (colors.length) {
@@ -35,7 +35,7 @@ public class Utils {
                 return Color.argb8888(colors[0]);
             
             case 2:
-                return mixTwoColors(colors[0], colors[1], step);
+                return mixTwoColors(colors[0], colors[1], (float) step);
             
             default:
                 
@@ -50,11 +50,11 @@ public class Utils {
                         / (colors.length - 1);
                 
                 // multiply to increase values to range between 0.0f and 1.0f
-                float localStep = (step - stepAtFirstColorIndex)
+                double localStep = (step - stepAtFirstColorIndex)
                         * (colors.length - 1);
                 
                 return mixTwoColors(colors[firstColorIndex],
-                        colors[firstColorIndex + 1], localStep);
+                        colors[firstColorIndex + 1], (float) localStep);
         }
         
     }
@@ -63,18 +63,22 @@ public class Utils {
         return Color.rgba8888(color1.r * (1f - ratio) + color2.r * ratio, color1.g * (1f - ratio) + color2.g * ratio, color1.b * (1f - ratio) + color2.b * ratio, color1.a * (1f - ratio) + color2.a * ratio);
     }
     
-    public static void makeAScreenShot(int recorderFrame) {
+    public static void makeAScreenShot(String name) {
         byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), true);
         
         for (int i4 = 4; i4 < pixels.length; i4 += 4) {
             pixels[i4 - 1] = (byte) 255;
         }
         
-        FileHandle file = Gdx.files.external("GollyRender/pict" + recorderFrame + ".png");
+        FileHandle file = Gdx.files.external("GollyRender/" + name + ".png");
         Pixmap pixmap = new Pixmap(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), Pixmap.Format.RGBA8888);
         BufferUtils.copy(pixels, 0, pixmap.getPixels(), pixels.length);
         PixmapIO.writePNG(file, pixmap);
         pixmap.dispose();
+    }
+    
+    public static void makeAScreenShot(int recorderFrame) {
+        makeAScreenShot("pict" + recorderFrame);
     }
     
     public static ArrayList<Float> generateSine(int sampleRate, float frequency, float duration) {

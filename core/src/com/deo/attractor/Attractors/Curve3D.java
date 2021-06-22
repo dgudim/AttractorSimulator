@@ -1,11 +1,11 @@
-package com.deo.attractor;
+package com.deo.attractor.Attractors;
 
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.deo.attractor.Utils.MathExpression;
 
-public class Curve {
+public class Curve3D {
     
     Vector3 startingPosition;
     
@@ -16,7 +16,7 @@ public class Curve {
     
     MathExpression[] simRules;
     
-    Curve(Vector3 startingPoint, MathExpression[] simRules, float timeStep, int maxPoints) {
+    Curve3D(Vector3 startingPoint, MathExpression[] simRules, float timeStep, int maxPoints) {
         
         startingPosition = startingPoint;
         this.simRules = simRules;
