@@ -2,6 +2,7 @@ package com.deo.attractor.Attractors;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Pixmap.Format;
@@ -9,17 +10,20 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.BufferUtils;
 import com.deo.attractor.Utils.MathExpression;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
 import static com.deo.attractor.Utils.Utils.fontChars;
 import static com.deo.attractor.Utils.Utils.makeAScreenShot;
-import static java.lang.StrictMath.floor;
 import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
 import static java.lang.StrictMath.random;
@@ -49,8 +53,28 @@ public class Attractor2D {
     ArrayList<Integer> computeIterationsPrev = new ArrayList<>();
     ArrayList<Float> deltaPrev = new ArrayList<>();
     
+    SpriteBatch computeBatch;
+    Pixmap computePixmap_x;
+    Pixmap computePixmap_y;
+    Texture computeTexture_x;
+    Texture computeTexture_y;
+    ShaderProgram computeShader;
+    int displayWidth, displayHeight, allPixels;
+    
+    float[] xValuesGPU_current;
+    float[] yValuesGPU_current;
+    
+    ArrayList<Float> xValuesGPU;
+    ArrayList<Float> yValuesGPU;
+    
+    int gpuIterations;
+    int targetIterations;
+    
+    float divisionPrecision = 100000000f;
+    
     Attractor2D(int attractorType, int numberOfThreads, int iterations, int startingPositionsPerThread) {
         
+        targetIterations = 10;
         allIterations = numberOfThreads * iterations * startingPositionsPerThread;
         
         pixmap = new Pixmap(WIDTH + 1, HEIGHT + 1, Format.RGBA8888);
@@ -130,6 +154,33 @@ public class Attractor2D {
             simRules.add(simRules_local);
             curves.add(new Curve2D(simRules_local, iterations, startingPositionsPerThread));
         }
+        
+        ShaderProgram.pedantic = false;
+        computeShader = new ShaderProgram(Gdx.files.internal("vertex.glsl"), Gdx.files.internal("fragment.glsl"));
+        computeBatch = new SpriteBatch();
+        computeBatch.disableBlending();
+        computeBatch.setShader(computeShader);
+        
+        displayWidth = Gdx.graphics.getWidth();
+        displayHeight = Gdx.graphics.getHeight();
+        allPixels = displayWidth * displayHeight;
+        
+        computePixmap_x = new Pixmap(displayWidth, displayHeight, Format.RGBA8888);
+        computePixmap_y = new Pixmap(displayWidth, displayHeight, Format.RGBA8888);
+        computePixmap_x.setBlending(Pixmap.Blending.None);
+        computePixmap_y.setBlending(Pixmap.Blending.None);
+        computeTexture_x = new Texture(computePixmap_x);
+        computeTexture_y = new Texture(computePixmap_y);
+    
+        xValuesGPU = new ArrayList<>();
+        yValuesGPU = new ArrayList<>();
+    
+        xValuesGPU_current = new float[allPixels];
+        yValuesGPU_current = new float[allPixels];
+        for (int i = 0; i < allPixels; i++) {
+            xValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+            yValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+        }
     }
     
     void startThreads() {
@@ -151,6 +202,10 @@ public class Attractor2D {
                 double width = 0;
                 double height = 0;
                 double minX = 100000, minY = 100000;
+                
+                for(int i = 0; i<xValuesGPU.size(); i++){
+                    curves.get(0).points.add(new Vector2(xValuesGPU.get(i), yValuesGPU.get(i)));
+                }
                 
                 for (int i = 0; i < threads; i++) {
                     for (int p = 0; p < curves.get(i).points.size; p++) {
@@ -226,9 +281,7 @@ public class Attractor2D {
                         pixmap.drawPixel(x, y, colorFunc((int) (curveFunc(curveFunc, intensityMap[x][y] / maxValue, contrast) * 768), colorPalette));
                     }
                 }
-                
                 Attractor2D.this.finished = true;
-                
             }
         }).start();
     }
@@ -275,7 +328,83 @@ public class Attractor2D {
         return r << 24 | g << 16 | b << 8 | 255;
     }
     
+    float[] decodeFloatsFromFrameBuffer() {
+        
+        float[] decodedValues = new float[allPixels];
+        
+        Gdx.gl.glPixelStorei(GL20.GL_PACK_ALIGNMENT, 1);
+        ByteBuffer pixels = BufferUtils.newByteBuffer(displayWidth * displayHeight * 4);
+        Gdx.gl.glReadPixels(0, 0, displayWidth, displayHeight, GL20.GL_RGBA, GL20.GL_UNSIGNED_BYTE, pixels);
+        
+        for (int i = 0; i < pixels.capacity() - 4; i += 4) {
+            int[] offsets = new int[4];
+            for (int off = i; off < i + 4; off++) {
+                if (pixels.get(off) < 0) {
+                    offsets[off - i] = 256;
+                }
+            }
+            float value = (
+                    (pixels.get(i) + offsets[0]) << 24)
+                    | ((pixels.get(i + 1) + offsets[1]) << 16)
+                    | ((pixels.get(i + 2) + offsets[2]) << 8)
+                    | (pixels.get(i + 3) + offsets[3]);
+            decodedValues[i / 4] = value;
+        }
+        return decodedValues;
+    }
+    
+    float[] processAndDecodeData(boolean y) {
+        computeShader.setUniformi("processY", y ? 1 : 0);
+        
+        computeBatch.begin();
+        computeTexture_x.bind(0);
+        computeTexture_y.bind(1);
+        computeShader.setUniformi("u_sampler2D_x", 0);
+        computeShader.setUniformi("u_sampler2D_y", 1);
+        computeBatch.draw(computeTexture_y, 0, 0);
+        computeBatch.end();
+        
+        return decodeFloatsFromFrameBuffer();
+    }
+    
+    void processOnGPU() {
+        
+        computeShader.setUniformi("attractorType", attractorType);
+        
+        for (int x = 0; x < displayWidth; x++) {
+            for (int y = 0; y < displayHeight; y++) {
+                computePixmap_x.drawPixel(x, y, (int) (xValuesGPU_current[x + y * displayWidth] * divisionPrecision));
+            }
+        }
+        for (int x = 0; x < displayWidth; x++) {
+            for (int y = 0; y < displayHeight; y++) {
+                computePixmap_y.drawPixel(x, y, (int) (yValuesGPU_current[x + y * displayWidth] * divisionPrecision));
+            }
+        }
+        computeTexture_x.draw(computePixmap_x, 0, 0);
+        computeTexture_y.draw(computePixmap_y, 0, 0);
+    
+        xValuesGPU_current = processAndDecodeData(false);
+        yValuesGPU_current = processAndDecodeData(true);
+    
+        for (float v : xValuesGPU_current) {
+            xValuesGPU.add(v);
+        }
+        for (float v : yValuesGPU_current) {
+            yValuesGPU.add(v);
+        }
+        gpuIterations ++;
+        computedIterations += allPixels;
+    }
+    
     void render(SpriteBatch batch, OrthographicCamera camera, ShapeRenderer renderer, float delta) {
+        
+        /*
+        if(!finished && gpuIterations < targetIterations){
+            processOnGPU();
+        }
+         */
+        
         int computedItersNow = computedIterations;
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
@@ -287,6 +416,7 @@ public class Attractor2D {
             screenshotMade = true;
         }
         if (!finished) {
+            
             renderer.setProjectionMatrix(camera.combined);
             renderer.begin(ShapeRenderer.ShapeType.Filled);
             
@@ -323,10 +453,9 @@ public class Attractor2D {
             font.draw(batch,
                     "KIpS:" + (int) ((itersSmoothed / deltaSmoothed) / 1000)
                             + " Delta:" + (int) (deltaSmoothed * 1000) + "ms "
-                            + (int) (computedIterations / (float)allIterations * 100 + 0.5f) + "%",
+                            + (int) (computedIterations / (float) allIterations * 100 + 0.5f) + "%",
                     -WIDTH / 2f + 50, -HEIGHT / 2f + 100);
             batch.end();
         }
-        
     }
 }
