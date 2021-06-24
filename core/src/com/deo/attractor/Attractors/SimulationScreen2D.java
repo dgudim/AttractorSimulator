@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
@@ -32,7 +31,7 @@ public class SimulationScreen2D implements Screen {
         renderer = new ShapeRenderer();
         renderer.setAutoShapeType(true);
         
-        attractor2D = new Attractor2D(8, 20, 5000, 256 * 4);
+        attractor2D = new Attractor2D(8, 20, 5000, 4);
         attractor2D.startThreads();
     }
     
