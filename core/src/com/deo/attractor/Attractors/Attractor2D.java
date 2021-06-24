@@ -20,6 +20,8 @@ import com.deo.attractor.Utils.MathExpression;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE0;
+import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE1;
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
 import static com.deo.attractor.Utils.Utils.fontChars;
@@ -68,13 +70,13 @@ public class Attractor2D {
     ArrayList<Float> yValuesGPU;
     
     int gpuIterations;
-    int targetIterations;
+    int targetGpuIterations;
     
     float divisionPrecision = 100000000f;
     
     Attractor2D(int attractorType, int numberOfThreads, int iterations, int startingPositionsPerThread) {
         
-        targetIterations = 10;
+        targetGpuIterations = 15;
         allIterations = numberOfThreads * iterations * startingPositionsPerThread;
         
         pixmap = new Pixmap(WIDTH + 1, HEIGHT + 1, Format.RGBA8888);
@@ -155,12 +157,6 @@ public class Attractor2D {
             curves.add(new Curve2D(simRules_local, iterations, startingPositionsPerThread));
         }
         
-        ShaderProgram.pedantic = false;
-        computeShader = new ShaderProgram(Gdx.files.internal("vertex.glsl"), Gdx.files.internal("fragment.glsl"));
-        computeBatch = new SpriteBatch();
-        computeBatch.disableBlending();
-        computeBatch.setShader(computeShader);
-        
         displayWidth = Gdx.graphics.getWidth();
         displayHeight = Gdx.graphics.getHeight();
         allPixels = displayWidth * displayHeight;
@@ -171,10 +167,17 @@ public class Attractor2D {
         computePixmap_y.setBlending(Pixmap.Blending.None);
         computeTexture_x = new Texture(computePixmap_x);
         computeTexture_y = new Texture(computePixmap_y);
-    
+        
+        ShaderProgram.pedantic = false;
+        computeShader = new ShaderProgram(Gdx.files.internal("vertex.glsl"), Gdx.files.internal("fragment.glsl"));
+        
+        computeBatch = new SpriteBatch();
+        computeBatch.disableBlending();
+        computeBatch.setShader(computeShader);
+        
         xValuesGPU = new ArrayList<>();
         yValuesGPU = new ArrayList<>();
-    
+        
         xValuesGPU_current = new float[allPixels];
         yValuesGPU_current = new float[allPixels];
         for (int i = 0; i < allPixels; i++) {
@@ -203,7 +206,7 @@ public class Attractor2D {
                 double height = 0;
                 double minX = 100000, minY = 100000;
                 
-                for(int i = 0; i<xValuesGPU.size(); i++){
+                for (int i = 0; i < min(xValuesGPU.size(), yValuesGPU.size()); i++) {
                     curves.get(0).points.add(new Vector2(xValuesGPU.get(i), yValuesGPU.get(i)));
                 }
                 
@@ -348,28 +351,29 @@ public class Attractor2D {
                     | ((pixels.get(i + 1) + offsets[1]) << 16)
                     | ((pixels.get(i + 2) + offsets[2]) << 8)
                     | (pixels.get(i + 3) + offsets[3]);
-            decodedValues[i / 4] = value;
+            decodedValues[i / 4] = value / divisionPrecision;
         }
         return decodedValues;
     }
     
     float[] processAndDecodeData(boolean y) {
+        computeShader.bind();
+        computeShader.setUniformi("attractorType", attractorType);
         computeShader.setUniformi("processY", y ? 1 : 0);
+        computeShader.setUniformi("u_sampler2D_y", 1);
+        
+        Gdx.gl.glActiveTexture(GL_TEXTURE1);
+        computeTexture_y.bind();
+        Gdx.gl.glActiveTexture(GL_TEXTURE0);
         
         computeBatch.begin();
-        computeTexture_x.bind(0);
-        computeTexture_y.bind(1);
-        computeShader.setUniformi("u_sampler2D_x", 0);
-        computeShader.setUniformi("u_sampler2D_y", 1);
-        computeBatch.draw(computeTexture_y, 0, 0);
+        computeBatch.draw(computeTexture_x, 0, 0);
         computeBatch.end();
         
         return decodeFloatsFromFrameBuffer();
     }
     
     void processOnGPU() {
-        
-        computeShader.setUniformi("attractorType", attractorType);
         
         for (int x = 0; x < displayWidth; x++) {
             for (int y = 0; y < displayHeight; y++) {
@@ -383,27 +387,24 @@ public class Attractor2D {
         }
         computeTexture_x.draw(computePixmap_x, 0, 0);
         computeTexture_y.draw(computePixmap_y, 0, 0);
-    
+        
         xValuesGPU_current = processAndDecodeData(false);
         yValuesGPU_current = processAndDecodeData(true);
-    
+        
         for (float v : xValuesGPU_current) {
             xValuesGPU.add(v);
         }
         for (float v : yValuesGPU_current) {
             yValuesGPU.add(v);
         }
-        gpuIterations ++;
-        computedIterations += allPixels;
+        gpuIterations++;
     }
     
     void render(SpriteBatch batch, OrthographicCamera camera, ShapeRenderer renderer, float delta) {
         
-        /*
-        if(!finished && gpuIterations < targetIterations){
+        if (!finished && gpuIterations < targetGpuIterations) {
             processOnGPU();
         }
-         */
         
         int computedItersNow = computedIterations;
         batch.setProjectionMatrix(camera.combined);
@@ -430,7 +431,7 @@ public class Attractor2D {
             batch.begin();
             
             if (computeIterationsPrev.size() < 150) {
-                computeIterationsPrev.add(computedIterations - computedItersNow);
+                computeIterationsPrev.add(computedIterations - computedItersNow + allPixels);
                 deltaPrev.add(delta);
             } else {
                 for (int i = 0; i < computeIterationsPrev.size() - 1; i++) {
