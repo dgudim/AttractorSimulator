@@ -105,6 +105,14 @@ public class Utils {
         return r << 24 | g << 16 | b << 8 | 255;
     }
     
+    public static void makeAScreenShot(String name, Pixmap pixmap, boolean disposeAfter) {
+        FileHandle file = Gdx.files.external("GollyRender/" + name + ".png");
+        PixmapIO.writePNG(file, pixmap);
+        if(disposeAfter){
+            pixmap.dispose();
+        }
+    }
+    
     public static void makeAScreenShot(String name) {
         byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), true);
         
@@ -112,11 +120,9 @@ public class Utils {
             pixels[i4 - 1] = (byte) 255;
         }
         
-        FileHandle file = Gdx.files.external("GollyRender/" + name + ".png");
         Pixmap pixmap = new Pixmap(Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), Pixmap.Format.RGBA8888);
         BufferUtils.copy(pixels, 0, pixmap.getPixels(), pixels.length);
-        PixmapIO.writePNG(file, pixmap);
-        pixmap.dispose();
+        makeAScreenShot(name, pixmap, true);
     }
     
     public static void makeAScreenShot(int recorderFrame) {

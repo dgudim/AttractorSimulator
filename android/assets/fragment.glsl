@@ -54,6 +54,7 @@ void main() {
             break;
             case (5):
             case (6):
+            case (9):
             newY = PI * sin(c*x) * cos(d*y);
             break;
             case (7):
@@ -81,6 +82,7 @@ void main() {
             break;
             case (5):
             case (6):
+            case (9):
             newX = PI * sin(a*y) * cos(b*x);
             break;
             case (7):

@@ -1,6 +1,7 @@
 package com.deo.attractor.Attractors;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -32,10 +33,13 @@ public class SimulationScreen2D implements Screen {
         renderer.setAutoShapeType(true);
         
         attractor2D = new Attractor2D(RenderMode.GPU,
-                2, 20,
+                9, 20,
                 5000, 256 * 4,
                 100, 2);
         attractor2D.startThreads();
+        
+        CameraController cameraInputController = new CameraController(camera);
+        Gdx.input.setInputProcessor(cameraInputController);
     }
     
     @Override
@@ -79,5 +83,63 @@ public class SimulationScreen2D implements Screen {
     @Override
     public void dispose() {
     
+    }
+}
+
+class CameraController implements InputProcessor {
+    
+    OrthographicCamera camera;
+    int lastScreenX = 0, lastScreenY = 0;
+    
+    public CameraController(OrthographicCamera camera) {
+        this.camera = camera;
+    }
+    
+    @Override
+    public boolean keyDown(int keycode) {
+        return false;
+    }
+    
+    @Override
+    public boolean keyUp(int keycode) {
+        return false;
+    }
+    
+    @Override
+    public boolean keyTyped(char character) {
+        return false;
+    }
+    
+    @Override
+    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+        lastScreenX = screenX;
+        lastScreenY = screenY;
+        return false;
+    }
+    
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+    
+    @Override
+    public boolean touchDragged(int screenX, int screenY, int pointer) {
+        camera.translate((lastScreenX - screenX) * camera.zoom, (screenY - lastScreenY) * camera.zoom, 0);
+        camera.update();
+        lastScreenX = screenX;
+        lastScreenY = screenY;
+        return false;
+    }
+    
+    @Override
+    public boolean mouseMoved(int screenX, int screenY) {
+        return false;
+    }
+    
+    @Override
+    public boolean scrolled(float amountX, float amountY) {
+        camera.zoom += amountY * camera.zoom * 0.1f;
+        camera.update();
+        return false;
     }
 }

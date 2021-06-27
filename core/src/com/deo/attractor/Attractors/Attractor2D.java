@@ -113,6 +113,10 @@ public class Attractor2D {
                 constants = new String[]{"a = 0.8", "b = 3"};
                 constants_numeric = new float[]{0.8f, 3, 0, 0};
                 break;
+            case (9):
+                constants = new String[]{"a = 1.57", "b = 1.57", "c = 1.57", "d = 6.28"};
+                constants_numeric = new float[]{1.57f, 1.57f, 1.57f, 6.28f};
+                break;
             default:
                 constants = new String[]{"a = -1.234039", "b = 1.497206", "c = 2.104149", "d = -0.930567"};
                 constants_numeric = new float[]{-1.234039f, 1.497206f, 2.104149f, -0.930567f};
@@ -135,6 +139,9 @@ public class Attractor2D {
             case (5):
             case (6):
                 contrast = 0.8f;
+                break;
+            case (9):
+                contrast = 0.59f;
                 break;
             case (7):
             default:
@@ -169,6 +176,7 @@ public class Attractor2D {
                         break;
                     case (5):
                     case (6):
+                    case (9):
                         simRules_local[0] = new MathExpression("3.1415926 * sin(a*y) * cos(b*x)", bulkArgs, constants);
                         simRules_local[1] = new MathExpression("3.1415926 * sin(c*x) * cos(d*y)", bulkArgs, constants);
                         break;
@@ -402,7 +410,7 @@ public class Attractor2D {
     void render(SpriteBatch batch, OrthographicCamera camera, ShapeRenderer renderer, float delta) {
         int computedItersNow = computedIterations;
         
-        if(renderMode.equals(GPU)){
+        if (renderMode.equals(GPU)) {
             if (computedIterations < allIterations) {
                 processOnGPU();
                 GPUCurve.progress = computedIterations / (float) allIterations;
@@ -418,6 +426,7 @@ public class Attractor2D {
         batch.end();
         if (finished && !screenshotMade) {
             makeAScreenShot("Attractor2D" + attractorType + "_" + random());
+            makeAScreenShot("FullRes_Attractor2D" + attractorType + "_" + random(), pixmap, false);
             screenshotMade = true;
         }
         if (!finished) {
