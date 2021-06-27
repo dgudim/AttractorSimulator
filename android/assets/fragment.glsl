@@ -5,12 +5,12 @@ varying vec2 v_texCoord0;
 uniform sampler2D u_sampler2D_x;
 uniform sampler2D u_sampler2D_y;
 
-const float PI = 3.1415;
+const float PI = 3.141592;
 
-const float a = -1.2340;
-const float b = 1.4972;
-const float c = 2.1041;
-const float d = -0.9305;
+uniform float a;
+uniform float b;
+uniform float c;
+uniform float d;
 
 uniform int attractorType;
 

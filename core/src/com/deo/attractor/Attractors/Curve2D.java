@@ -33,7 +33,7 @@ public class Curve2D {
                     points.add(calculateNextPosition(new Vector2((float) ((random() - 0.5) * 4), (float) ((random() - 0.5) * 4))));
                     for (int iter = 0; iter < iterations; iter++) {
                         points.add(calculateNextPosition(points.get(points.size - 1)));
-                        progress = (iter + i * iterations) / (float) (iterations * startingPositions);
+                        progress = (i * iterations + iter) / (float) (iterations * startingPositions);
                         computedIterations ++;
                     }
                 }

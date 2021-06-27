@@ -22,20 +22,27 @@ import java.util.ArrayList;
 
 import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE0;
 import static com.badlogic.gdx.graphics.GL20.GL_TEXTURE1;
+import static com.deo.attractor.Attractors.RenderMode.CPU;
+import static com.deo.attractor.Attractors.RenderMode.GPU;
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
+import static com.deo.attractor.Utils.Utils.colorFunc;
+import static com.deo.attractor.Utils.Utils.curveFunc;
 import static com.deo.attractor.Utils.Utils.fontChars;
 import static com.deo.attractor.Utils.Utils.makeAScreenShot;
+import static java.lang.StrictMath.abs;
 import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
 import static java.lang.StrictMath.random;
 
+enum RenderMode {GPU, CPU}
+
 public class Attractor2D {
     
-    ArrayList<MathExpression[]> simRules;
+    private final RenderMode renderMode;
+    
     final Array<Curve2D> curves;
     private final int threads;
-    String[] constants;
     
     int[][] intensityMap;
     Pixmap pixmap;
@@ -44,11 +51,12 @@ public class Attractor2D {
     int attractorType;
     float contrast;
     int colorPalette = 4;
+    float copyOverThreadProgress;
     
     boolean finished = false;
     boolean screenshotMade = false;
     
-    BitmapFont font;
+    private final BitmapFont font;
     
     public static int computedIterations;
     public static int allIterations;
@@ -66,18 +74,16 @@ public class Attractor2D {
     float[] xValuesGPU_current;
     float[] yValuesGPU_current;
     
-    ArrayList<Float> xValuesGPU;
-    ArrayList<Float> yValuesGPU;
-    
-    int gpuIterations;
-    int targetGpuIterations;
+    Array<Vector2> GPUValues;
+    Curve2D GPUCurve;
     
     float divisionPrecision = 100000000f;
     
-    Attractor2D(int attractorType, int numberOfThreads, int iterations, int startingPositionsPerThread) {
+    Attractor2D(RenderMode renderMode, int attractorType, int CPUThreads, int iterationsPerPosition, int startingPositionsPerThread, int GPUIterations, int GPUPointsDivider) {
         
-        targetGpuIterations = 15;
-        allIterations = numberOfThreads * iterations * startingPositionsPerThread;
+        this.renderMode = renderMode;
+        
+        allIterations = CPUThreads * iterationsPerPosition * startingPositionsPerThread;
         
         pixmap = new Pixmap(WIDTH + 1, HEIGHT + 1, Format.RGBA8888);
         texture = new Texture(pixmap);
@@ -92,103 +98,135 @@ public class Attractor2D {
         font.getData().markupEnabled = true;
         
         this.attractorType = attractorType;
-        threads = numberOfThreads;
+        threads = CPUThreads;
         
-        simRules = new ArrayList<>();
-        
+        String[] constants;
+        float[] constants_numeric;
         String[] bulkArgs = new String[]{"x = 0", "y = 0"};
-        constants = new String[]{"a = -1.23403895", "b = 1.49720576", "c = 2.10414903", "d = -0.93056731"};
-        
         switch (attractorType) {
             case (6):
             case (8):
-                constants = new String[]{"a = 3.1415926", "b = 3.1415926", "c = 3.1415926", "d = 3.1415926"};
+                constants = new String[]{"a = 3.141592", "b = 3.141592", "c = 3.141592", "d = 3.141592"};
+                constants_numeric = new float[]{3.141592f, 3.141592f, 3.141592f, 3.141592f};
+                break;
+            case (7):
+                constants = new String[]{"a = 0.8", "b = 3"};
+                constants_numeric = new float[]{0.8f, 3, 0, 0};
+                break;
+            default:
+                constants = new String[]{"a = -1.234039", "b = 1.497206", "c = 2.104149", "d = -0.930567"};
+                constants_numeric = new float[]{-1.234039f, 1.497206f, 2.104149f, -0.930567f};
+        }
+        
+        contrast = 0.5f;
+        switch (attractorType) {
+            case (0):
+                contrast = 0.4f;
+                break;
+            case (1):
+            case (2):
+            case (8):
+                contrast = 0.7f;
+                break;
+            case (3):
+            case (4):
+                contrast = 0.43f;
+                break;
+            case (5):
+            case (6):
+                contrast = 0.8f;
                 break;
             case (7):
             default:
-                constants = new String[]{"a = 0.8", "b = 3"};
-                break;
+                contrast = 0.6f;
         }
         
         curves = new Array<>();
-        contrast = 0.5f;
-        for (int i = 0; i < threads; i++) {
-            MathExpression[] simRules_local = new MathExpression[2];
-            switch (attractorType) {
-                case (0):
-                    simRules_local[0] = new MathExpression("sin(a*y) - cos(b*x)", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("sin(c*x) - cos(d*y)", bulkArgs, constants);
-                    contrast = 0.4f;
-                    break;
-                case (1):
-                    simRules_local[0] = new MathExpression("d * sin(a*x) - sin(b*y)", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("c * cos(a*x) + cos(b*y)", bulkArgs, constants);
-                    contrast = 0.7f;
-                    break;
-                case (2):
-                case (8):
-                    simRules_local[0] = new MathExpression("sin(a*y) + c*cos(a*x)", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("sin(b*x) + d*cos(b*y)", bulkArgs, constants);
-                    contrast = 0.7f;
-                    break;
-                case (3):
-                    simRules_local[0] = new MathExpression("cos(a*y) + cos(b*x)", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("sin(c*x) + sin(d*y)", bulkArgs, constants);
-                    contrast = 0.43f;
-                    break;
-                case (4):
-                    simRules_local[0] = new MathExpression("cos(a*y) - sin(b*x)", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("sin(c*x) - cos(d*y)", bulkArgs, constants);
-                    contrast = 0.43f;
-                    break;
-                case (5):
-                case (6):
-                    simRules_local[0] = new MathExpression("3.1415926 * sin(a*y) * cos(b*x)", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("3.1415926 * sin(c*x) * cos(d*y)", bulkArgs, constants);
-                    contrast = 0.8f;
-                    break;
-                case (7):
-                default:
-                    simRules_local[0] = new MathExpression("a * sin(y + tan(b * y))", bulkArgs, constants);
-                    simRules_local[1] = new MathExpression("a * sin(x + tan(b * x))", bulkArgs, constants);
-                    contrast = 0.6f;
+        if (renderMode.equals(CPU)) {
+            for (int i = 0; i < threads; i++) {
+                MathExpression[] simRules_local = new MathExpression[2];
+                switch (attractorType) {
+                    case (0):
+                        simRules_local[0] = new MathExpression("sin(a*y) - cos(b*x)", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("sin(c*x) - cos(d*y)", bulkArgs, constants);
+                        break;
+                    case (1):
+                        simRules_local[0] = new MathExpression("d * sin(a*x) - sin(b*y)", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("c * cos(a*x) + cos(b*y)", bulkArgs, constants);
+                        break;
+                    case (2):
+                    case (8):
+                        simRules_local[0] = new MathExpression("sin(a*y) + c*cos(a*x)", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("sin(b*x) + d*cos(b*y)", bulkArgs, constants);
+                        break;
+                    case (3):
+                        simRules_local[0] = new MathExpression("cos(a*y) + cos(b*x)", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("sin(c*x) + sin(d*y)", bulkArgs, constants);
+                        break;
+                    case (4):
+                        simRules_local[0] = new MathExpression("cos(a*y) - sin(b*x)", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("sin(c*x) - cos(d*y)", bulkArgs, constants);
+                        break;
+                    case (5):
+                    case (6):
+                        simRules_local[0] = new MathExpression("3.1415926 * sin(a*y) * cos(b*x)", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("3.1415926 * sin(c*x) * cos(d*y)", bulkArgs, constants);
+                        break;
+                    case (7):
+                    default:
+                        simRules_local[0] = new MathExpression("a * sin(y + tan(b * y))", bulkArgs, constants);
+                        simRules_local[1] = new MathExpression("a * sin(x + tan(b * x))", bulkArgs, constants);
+                }
+                curves.add(new Curve2D(simRules_local, iterationsPerPosition, startingPositionsPerThread));
             }
-            simRules.add(simRules_local);
-            curves.add(new Curve2D(simRules_local, iterations, startingPositionsPerThread));
         }
         
-        displayWidth = Gdx.graphics.getWidth();
-        displayHeight = Gdx.graphics.getHeight();
-        allPixels = displayWidth * displayHeight;
-        
-        computePixmap_x = new Pixmap(displayWidth, displayHeight, Format.RGBA8888);
-        computePixmap_y = new Pixmap(displayWidth, displayHeight, Format.RGBA8888);
-        computePixmap_x.setBlending(Pixmap.Blending.None);
-        computePixmap_y.setBlending(Pixmap.Blending.None);
-        computeTexture_x = new Texture(computePixmap_x);
-        computeTexture_y = new Texture(computePixmap_y);
-        
-        ShaderProgram.pedantic = false;
-        computeShader = new ShaderProgram(Gdx.files.internal("vertex.glsl"), Gdx.files.internal("fragment.glsl"));
-        
-        computeBatch = new SpriteBatch();
-        computeBatch.disableBlending();
-        computeBatch.setShader(computeShader);
-        
-        xValuesGPU = new ArrayList<>();
-        yValuesGPU = new ArrayList<>();
-        
-        xValuesGPU_current = new float[allPixels];
-        yValuesGPU_current = new float[allPixels];
-        for (int i = 0; i < allPixels; i++) {
-            xValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
-            yValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+        if (renderMode.equals(GPU)) {
+            displayWidth = Gdx.graphics.getWidth() / GPUPointsDivider;
+            displayHeight = Gdx.graphics.getHeight() / GPUPointsDivider;
+            allPixels = displayWidth * displayHeight;
+            
+            allIterations = GPUIterations * allPixels;
+            
+            computePixmap_x = new Pixmap(displayWidth, displayHeight, Format.RGBA8888);
+            computePixmap_y = new Pixmap(displayWidth, displayHeight, Format.RGBA8888);
+            computePixmap_x.setBlending(Pixmap.Blending.None);
+            computePixmap_y.setBlending(Pixmap.Blending.None);
+            computeTexture_x = new Texture(computePixmap_x);
+            computeTexture_y = new Texture(computePixmap_y);
+            
+            ShaderProgram.pedantic = false;
+            computeShader = new ShaderProgram(Gdx.files.internal("vertex.glsl"), Gdx.files.internal("fragment.glsl"));
+            computeShader.bind();
+            computeShader.setUniformi("attractorType", attractorType);
+            computeShader.setUniformi("u_sampler2D_y", 1);
+            computeShader.setUniformf("a", constants_numeric[0]);
+            computeShader.setUniformf("b", constants_numeric[1]);
+            computeShader.setUniformf("c", constants_numeric[2]);
+            computeShader.setUniformf("d", constants_numeric[3]);
+            
+            computeBatch = new SpriteBatch();
+            computeBatch.disableBlending();
+            computeBatch.setShader(computeShader);
+            
+            GPUCurve = new Curve2D(null, 0, 0);
+            GPUValues = GPUCurve.points;
+            curves.add(GPUCurve);
+            
+            xValuesGPU_current = new float[allPixels];
+            yValuesGPU_current = new float[allPixels];
+            for (int i = 0; i < allPixels; i++) {
+                xValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+                yValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+            }
         }
     }
     
     void startThreads() {
-        for (int i = 0; i < threads; i++) {
-            curves.get(i).startThread();
+        if (renderMode.equals(CPU)) {
+            for (int i = 0; i < threads; i++) {
+                curves.get(i).startThread();
+            }
         }
         new Thread(new Runnable() {
             @Override
@@ -196,38 +234,38 @@ public class Attractor2D {
                 boolean finished = false;
                 while (!finished) {
                     finished = true;
-                    for (int i = 0; i < threads; i++) {
+                    for (int i = 0; i < curves.size; i++) {
                         if (!curves.get(i).finished) {
                             finished = false;
                         }
                     }
                 }
+                
                 double width = 0;
                 double height = 0;
                 double minX = 100000, minY = 100000;
                 
-                for (int i = 0; i < min(xValuesGPU.size(), yValuesGPU.size()); i++) {
-                    curves.get(0).points.add(new Vector2(xValuesGPU.get(i), yValuesGPU.get(i)));
-                }
-                
-                for (int i = 0; i < threads; i++) {
+                for (int i = 0; i < curves.size; i++) {
                     for (int p = 0; p < curves.get(i).points.size; p++) {
                         minX = min(minX, curves.get(i).points.get(p).x);
                         minY = min(minY, curves.get(i).points.get(p).y);
+                        copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
                     }
                 }
                 
-                for (int i = 0; i < threads; i++) {
+                for (int i = 0; i < curves.size; i++) {
                     for (int p = 0; p < curves.get(i).points.size; p++) {
                         curves.get(i).points.get(p).x -= minX < 0 ? minX : -minX;
                         curves.get(i).points.get(p).y -= minY < 0 ? minY : -minY;
+                        copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
                     }
                 }
                 
-                for (int i = 0; i < threads; i++) {
+                for (int i = 0; i < curves.size; i++) {
                     for (int p = 0; p < curves.get(i).points.size; p++) {
                         width = max(width, curves.get(i).points.get(p).x);
                         height = max(height, curves.get(i).points.get(p).y);
+                        copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
                     }
                 }
                 
@@ -237,17 +275,19 @@ public class Attractor2D {
                 double xOffset = WIDTH / 2d - width / zoom / 2d;
                 double yOffset = HEIGHT / 2d - height / zoom / 2d;
                 
-                for (int i = 0; i < threads; i++) {
+                for (int i = 0; i < curves.size; i++) {
                     for (int p = 0; p < curves.get(i).points.size; p++) {
                         curves.get(i).points.get(p).x /= zoom;
                         curves.get(i).points.get(p).y /= zoom;
                         
                         curves.get(i).points.get(p).x += xOffset;
                         curves.get(i).points.get(p).y += yOffset;
+                        
+                        copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
                     }
                 }
                 
-                for (int i = 0; i < threads; i++) {
+                for (int i = 0; i < curves.size; i++) {
                     for (int p = 0; p < curves.get(i).points.size; p++) {
                         
                         int x = (int) curves.get(i).points.get(p).x;
@@ -257,11 +297,12 @@ public class Attractor2D {
                         
                         for (int xOff = -1; xOff <= 1; ++xOff) {
                             for (int yOff = -1; yOff <= 1; ++yOff) {
-                                if (x + xOff >= 0 && x + xOff < WIDTH + 1 && y + yOff >= 0 && y + yOff < HEIGHT + 1) {
+                                if (x + xOff >= 0 && x + xOff <= WIDTH && y + yOff >= 0 && y + yOff < HEIGHT) {
                                     intensityMap[x + xOff][y + yOff]++;
                                 }
                             }
                         }
+                        copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
                     }
                 }
                 
@@ -271,8 +312,6 @@ public class Attractor2D {
                         maxValue = max(maxValue, intensityMap[x][y]);
                     }
                 }
-                
-                contrast = 0.8f;
                 
                 int curveFunc = 0;
                 if (Math.abs(contrast - .5) < .04) curveFunc = 1;
@@ -289,51 +328,14 @@ public class Attractor2D {
         }).start();
     }
     
-    double curveFunc(int type, double value1, double value2) {
-        switch (type) {
-            case (0):
-            default:
-                return Math.pow(value1, value2);
-            case (1):
-                return Math.sqrt(value1);
-            case (2):
-                return value1;
-        }
-    }
-    
-    int cap(int a) {
-        return Math.min(a, 255);
-    }
-    
-    int colorFunc(int v, int type) {
-        switch (type) {
-            case (0):
-            default:
-                return rgbToRGBA8888(cap(v), cap(v << 1), cap(v << 2));
-            case (1):
-                return rgbToRGBA8888(cap(v), cap(v << 2), cap(v << 1));
-            case (2):
-                return rgbToRGBA8888(cap(v << 1), cap(v), cap(v << 2));
-            case (3):
-                return rgbToRGBA8888(cap(v << 1), cap(v << 2), cap(v));
-            case (4):
-                return rgbToRGBA8888(cap(v << 2), cap(v << 1), cap(v));
-            case (5):
-                return rgbToRGBA8888(cap(v << 2), cap(v), cap(v << 1));
-            case (6):
-                return rgbToRGBA8888(cap(v << 1), cap(v << 1), cap(v));
-            case (7):
-                return rgbToRGBA8888(cap(v << 1), cap(v), cap(v << 1));
-        }
-    }
-    
-    int rgbToRGBA8888(int r, int g, int b) {
-        return r << 24 | g << 16 | b << 8 | 255;
-    }
-    
-    float[] decodeFloatsFromFrameBuffer() {
+    void decodeFloatsFromFrameBuffer(boolean y) {
         
-        float[] decodedValues = new float[allPixels];
+        float[] decodedValuesBufferArray;
+        if (y) {
+            decodedValuesBufferArray = yValuesGPU_current;
+        } else {
+            decodedValuesBufferArray = xValuesGPU_current;
+        }
         
         Gdx.gl.glPixelStorei(GL20.GL_PACK_ALIGNMENT, 1);
         ByteBuffer pixels = BufferUtils.newByteBuffer(displayWidth * displayHeight * 4);
@@ -351,16 +353,13 @@ public class Attractor2D {
                     | ((pixels.get(i + 1) + offsets[1]) << 16)
                     | ((pixels.get(i + 2) + offsets[2]) << 8)
                     | (pixels.get(i + 3) + offsets[3]);
-            decodedValues[i / 4] = value / divisionPrecision;
+            decodedValuesBufferArray[i / 4] = value / divisionPrecision;
         }
-        return decodedValues;
     }
     
-    float[] processAndDecodeData(boolean y) {
+    void processAndDecodeData(boolean y) {
         computeShader.bind();
-        computeShader.setUniformi("attractorType", attractorType);
         computeShader.setUniformi("processY", y ? 1 : 0);
-        computeShader.setUniformi("u_sampler2D_y", 1);
         
         Gdx.gl.glActiveTexture(GL_TEXTURE1);
         computeTexture_y.bind();
@@ -370,7 +369,7 @@ public class Attractor2D {
         computeBatch.draw(computeTexture_x, 0, 0);
         computeBatch.end();
         
-        return decodeFloatsFromFrameBuffer();
+        decodeFloatsFromFrameBuffer(y);
     }
     
     void processOnGPU() {
@@ -388,25 +387,30 @@ public class Attractor2D {
         computeTexture_x.draw(computePixmap_x, 0, 0);
         computeTexture_y.draw(computePixmap_y, 0, 0);
         
-        xValuesGPU_current = processAndDecodeData(false);
-        yValuesGPU_current = processAndDecodeData(true);
+        processAndDecodeData(false);
+        processAndDecodeData(true);
         
-        for (float v : xValuesGPU_current) {
-            xValuesGPU.add(v);
+        for (int i = 0; i < xValuesGPU_current.length; i++) {
+            if (abs(xValuesGPU_current[i]) > 15) {
+                System.exit(0);
+            }
+            GPUValues.add(new Vector2(xValuesGPU_current[i], yValuesGPU_current[i]));
         }
-        for (float v : yValuesGPU_current) {
-            yValuesGPU.add(v);
-        }
-        gpuIterations++;
+        computedIterations += allPixels;
     }
     
     void render(SpriteBatch batch, OrthographicCamera camera, ShapeRenderer renderer, float delta) {
+        int computedItersNow = computedIterations;
         
-        if (!finished && gpuIterations < targetGpuIterations) {
-            processOnGPU();
+        if(renderMode.equals(GPU)){
+            if (computedIterations < allIterations) {
+                processOnGPU();
+                GPUCurve.progress = computedIterations / (float) allIterations;
+            } else if (!GPUCurve.finished) {
+                GPUCurve.finished = true;
+            }
         }
         
-        int computedItersNow = computedIterations;
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         texture.draw(pixmap, 0, 0);
@@ -427,34 +431,40 @@ public class Attractor2D {
                 renderer.setColor(new Color(1 - curves.get(i).progress, curves.get(i).progress, 0.3f, 1));
                 renderer.rect(-WIDTH / 2f + divWidth * i + 10, -HEIGHT / 2f, divWidth - 10, HEIGHT / 4f * curves.get(i).progress);
             }
+            
+            renderer.setColor(Color.GOLDENROD);
+            renderer.rect(-WIDTH / 2f, HEIGHT / 2f - 70, WIDTH * copyOverThreadProgress, 70);
+            
             renderer.end();
             batch.begin();
             
-            if (computeIterationsPrev.size() < 150) {
-                computeIterationsPrev.add(computedIterations - computedItersNow + allPixels);
+            int iterationsPerTick = computedIterations - computedItersNow;
+            
+            if (computeIterationsPrev.size() < (renderMode.equals(GPU) ? 10 : 150)) {
+                computeIterationsPrev.add(iterationsPerTick);
                 deltaPrev.add(delta);
             } else {
                 for (int i = 0; i < computeIterationsPrev.size() - 1; i++) {
                     computeIterationsPrev.set(i, computeIterationsPrev.get(i + 1));
                     deltaPrev.set(i, deltaPrev.get(i + 1));
                 }
-                computeIterationsPrev.set(computeIterationsPrev.size() - 1, computedIterations - computedItersNow);
+                computeIterationsPrev.set(computeIterationsPrev.size() - 1, iterationsPerTick);
                 deltaPrev.set(deltaPrev.size() - 1, delta);
             }
             
-            float itersSmoothed = 0;
+            float iterationsSmoothed = 0;
             float deltaSmoothed = 0;
             for (int i = 0; i < computeIterationsPrev.size(); i++) {
-                itersSmoothed += computeIterationsPrev.get(i);
+                iterationsSmoothed += computeIterationsPrev.get(i);
                 deltaSmoothed += deltaPrev.get(i);
             }
-            itersSmoothed /= (float) computeIterationsPrev.size();
+            iterationsSmoothed /= (float) computeIterationsPrev.size();
             deltaSmoothed /= (float) deltaPrev.size();
             
             font.draw(batch,
-                    "KIpS:" + (int) ((itersSmoothed / deltaSmoothed) / 1000)
+                    "KIpS:" + (int) ((iterationsSmoothed / deltaSmoothed) / 1000)
                             + " Delta:" + (int) (deltaSmoothed * 1000) + "ms "
-                            + (int) (computedIterations / (float) allIterations * 100 + 0.5f) + "%",
+                            + (int) (computedIterations / (float) allIterations * 100) + "%",
                     -WIDTH / 2f + 50, -HEIGHT / 2f + 100);
             batch.end();
         }

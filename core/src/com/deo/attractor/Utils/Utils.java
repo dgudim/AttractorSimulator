@@ -63,6 +63,48 @@ public class Utils {
         return Color.rgba8888(color1.r * (1f - ratio) + color2.r * ratio, color1.g * (1f - ratio) + color2.g * ratio, color1.b * (1f - ratio) + color2.b * ratio, color1.a * (1f - ratio) + color2.a * ratio);
     }
     
+    public static double curveFunc(int type, double value1, double value2) {
+        switch (type) {
+            case (0):
+            default:
+                return Math.pow(value1, value2);
+            case (1):
+                return Math.sqrt(value1);
+            case (2):
+                return value1;
+        }
+    }
+    
+    public static int capTo255(int a) {
+        return Math.min(a, 255);
+    }
+    
+    public static int colorFunc(int value, int type) {
+        switch (type) {
+            case (0):
+            default:
+                return rgbToRGBA8888(capTo255(value), capTo255(value << 1), capTo255(value << 2));
+            case (1):
+                return rgbToRGBA8888(capTo255(value), capTo255(value << 2), capTo255(value << 1));
+            case (2):
+                return rgbToRGBA8888(capTo255(value << 1), capTo255(value), capTo255(value << 2));
+            case (3):
+                return rgbToRGBA8888(capTo255(value << 1), capTo255(value << 2), capTo255(value));
+            case (4):
+                return rgbToRGBA8888(capTo255(value << 2), capTo255(value << 1), capTo255(value));
+            case (5):
+                return rgbToRGBA8888(capTo255(value << 2), capTo255(value), capTo255(value << 1));
+            case (6):
+                return rgbToRGBA8888(capTo255(value << 1), capTo255(value << 1), capTo255(value));
+            case (7):
+                return rgbToRGBA8888(capTo255(value << 1), capTo255(value), capTo255(value << 1));
+        }
+    }
+    
+    public static int rgbToRGBA8888(int r, int g, int b) {
+        return r << 24 | g << 16 | b << 8 | 255;
+    }
+    
     public static void makeAScreenShot(String name) {
         byte[] pixels = ScreenUtils.getFrameBufferPixels(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight(), true);
         

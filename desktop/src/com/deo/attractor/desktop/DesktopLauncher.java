@@ -11,11 +11,10 @@ public class DesktopLauncher {
 	public static void main (String[] arg) {
 		LwjglApplicationConfiguration config = new LwjglApplicationConfiguration();
 		
-		config.foregroundFPS = 60;
 		config.width = WIDTH;
 		config.height = HEIGHT;
 		config.fullscreen = true;
-		config.resizable = true;
+		config.resizable = false;
 		
 		new LwjglApplication(new Launcher(), config);
 	}

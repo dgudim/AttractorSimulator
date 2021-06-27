@@ -31,7 +31,10 @@ public class SimulationScreen2D implements Screen {
         renderer = new ShapeRenderer();
         renderer.setAutoShapeType(true);
         
-        attractor2D = new Attractor2D(8, 20, 5000, 4);
+        attractor2D = new Attractor2D(RenderMode.GPU,
+                2, 20,
+                5000, 256 * 4,
+                100, 2);
         attractor2D.startThreads();
     }
     
