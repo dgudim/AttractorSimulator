@@ -1,12 +1,14 @@
 package com.deo.attractor.Attractors;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import static com.deo.attractor.Launcher.HEIGHT;
@@ -21,10 +23,12 @@ public class SimulationScreen2D implements Screen {
     ScreenViewport viewport;
     ShapeRenderer renderer;
     
-    public SimulationScreen2D() {
+    Stage stage;
+    
+    public SimulationScreen2D(int renderResolutionMultiplier) {
         
-        WIDTH *= 4;
-        HEIGHT *= 4;
+        WIDTH *= renderResolutionMultiplier;
+        HEIGHT *= renderResolutionMultiplier;
         
         batch = new SpriteBatch();
         camera = new OrthographicCamera(WIDTH, HEIGHT);
@@ -32,14 +36,21 @@ public class SimulationScreen2D implements Screen {
         renderer = new ShapeRenderer();
         renderer.setAutoShapeType(true);
         
-        attractor2D = new Attractor2D(RenderMode.GPU,
-                9, 20,
+        stage = new Stage(viewport, batch);
+        attractor2D = new Attractor2D(
+                RenderMode.GPU, stage,
+                RuleSet.POPCORN_DEFAULT,
+                AttractorType.POPCORN,
+                Palette.ORANGE,
+                20,
                 5000, 256 * 4,
-                100, 2);
+                50, 2);
         attractor2D.startThreads();
-        
-        CameraController cameraInputController = new CameraController(camera);
-        Gdx.input.setInputProcessor(cameraInputController);
+        InputMultiplexer multiplexer = new InputMultiplexer();
+        AttractorController attractorController = new AttractorController(attractor2D);
+        multiplexer.addProcessor(stage);
+        multiplexer.addProcessor(attractorController);
+        Gdx.input.setInputProcessor(multiplexer);
     }
     
     @Override
@@ -52,6 +63,10 @@ public class SimulationScreen2D implements Screen {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         attractor2D.render(batch, camera, renderer, delta);
+        if (attractor2D.finished) {
+            stage.draw();
+            stage.act(delta);
+        }
     }
     
     @Override
@@ -86,13 +101,13 @@ public class SimulationScreen2D implements Screen {
     }
 }
 
-class CameraController implements InputProcessor {
+class AttractorController implements InputProcessor {
     
-    OrthographicCamera camera;
+    Attractor2D attractor2D;
     int lastScreenX = 0, lastScreenY = 0;
     
-    public CameraController(OrthographicCamera camera) {
-        this.camera = camera;
+    public AttractorController(Attractor2D attractor2D) {
+        this.attractor2D = attractor2D;
     }
     
     @Override
@@ -124,8 +139,7 @@ class CameraController implements InputProcessor {
     
     @Override
     public boolean touchDragged(int screenX, int screenY, int pointer) {
-        camera.translate((lastScreenX - screenX) * camera.zoom, (screenY - lastScreenY) * camera.zoom, 0);
-        camera.update();
+        attractor2D.translate((screenX - lastScreenX), (screenY - lastScreenY));
         lastScreenX = screenX;
         lastScreenY = screenY;
         return false;
@@ -138,8 +152,7 @@ class CameraController implements InputProcessor {
     
     @Override
     public boolean scrolled(float amountX, float amountY) {
-        camera.zoom += amountY * camera.zoom * 0.1f;
-        camera.update();
+        attractor2D.zoom(amountY / 100f);
         return false;
     }
 }

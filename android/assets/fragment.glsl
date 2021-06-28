@@ -1,4 +1,3 @@
-
 varying vec4 v_color;
 varying vec2 v_texCoord0;
 
@@ -12,7 +11,7 @@ uniform float b;
 uniform float c;
 uniform float d;
 
-uniform int attractorType;
+uniform int ruleSet;
 
 const float Precision = 100000000;
 
@@ -34,8 +33,8 @@ void main() {
 
     int outputPixel;
 
-    if(processY == 1){
-        switch (attractorType){
+    if (processY == 1){
+        switch (ruleSet){
             case (0):
             newY = sin(c*x) - cos(d*y);
             break;
@@ -43,7 +42,6 @@ void main() {
             newY = c * cos(a*x) + cos(b*y);
             break;
             case (2):
-            case (8):
             newY = sin(b*x) + d*cos(b*y);
             break;
             case (3):
@@ -53,17 +51,22 @@ void main() {
             newY = sin(c*x) - cos(d*y);
             break;
             case (5):
-            case (6):
-            case (9):
             newY = PI * sin(c*x) * cos(d*y);
             break;
-            case (7):
+            case (6):
             newY = a * sin(x + tan(b * x));
+            break;
+            case (7):
+            newY = a * sin(x + tan(b * y));
+            break;
+            case (8):
+            float var1X = a * x + 2 * (1 - a) * x * x / ((1 + x * x) * (1 + x * x));
+            newY = a * var1X + 2 * (1 - a) * var1X * var1X / ((1 + var1X * var1X) * (1 + var1X * var1X)) - x;
             break;
         }
         outputPixel = int(newY * Precision);
-    }else{
-        switch (attractorType){
+    } else {
+        switch (ruleSet){
             case (0):
             newX = sin(a*y) - cos(b*x);
             break;
@@ -71,7 +74,6 @@ void main() {
             newX = d * sin(a*x) - sin(b*y);
             break;
             case (2):
-            case (8):
             newX = sin(a*y) + c*cos(a*x);
             break;
             case (3):
@@ -81,12 +83,16 @@ void main() {
             newX = cos(a*y) - sin(b*x);
             break;
             case (5):
-            case (6):
-            case (9):
             newX = PI * sin(a*y) * cos(b*x);
             break;
+            case (6):
+            newX = c * sin(y + tan(d * y));
+            break;
             case (7):
-            newX = a * sin(y + tan(b * y));
+            newX = c * sin(y + tan(d * x));
+            break;
+            case (8):
+            newX = b * y + a * x + 2 * (1 - a) * x * x / ((1 + x * x) * (1 + x * x));
             break;
         }
         outputPixel = int(newX * Precision);
