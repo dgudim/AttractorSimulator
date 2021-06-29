@@ -5,12 +5,16 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.PixmapIO;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.BufferUtils;
 import com.badlogic.gdx.utils.ScreenUtils;
 
 import java.util.ArrayList;
 
 import static java.lang.StrictMath.PI;
+import static java.lang.StrictMath.pow;
 import static java.lang.StrictMath.sin;
 
 public class Utils {
@@ -67,6 +71,15 @@ public class Utils {
         return r << 24 | g << 16 | b << 8 | 255;
     }
     
+    public static TextureRegionDrawable makeFilledRectangle(int width, int height, Color color){
+        Pixmap pixmap = new Pixmap(width, height, Pixmap.Format.RGBA8888);
+        pixmap.setColor(color);
+        pixmap.fill();
+        TextureRegionDrawable rectangle = new TextureRegionDrawable(new TextureRegion(new Texture(pixmap)));
+        pixmap.dispose();
+        return rectangle;
+    }
+    
     public static void makeAScreenShot(String name, Pixmap pixmap, boolean disposeAfter) {
         FileHandle file = Gdx.files.external("GollyRender/" + name + ".png");
         PixmapIO.writePNG(file, pixmap);
@@ -98,6 +111,10 @@ public class Utils {
             samples.add((float) sin(i * frequency));
         }
         return samples;
+    }
+    
+    public static float formatNumber(int digits, float value){
+        return (int) (value * pow(10, digits)) / (float)pow(10, digits);
     }
     
 }

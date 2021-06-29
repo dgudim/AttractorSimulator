@@ -11,12 +11,10 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -31,8 +29,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.BufferUtils;
+import com.deo.attractor.Utils.AttractorDimensions;
 import com.deo.attractor.Utils.MathExpression;
-import com.deo.attractor.Utils.Vector4;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -44,9 +42,10 @@ import static com.deo.attractor.Attractors.RenderMode.GPU;
 import static com.deo.attractor.Launcher.HEIGHT;
 import static com.deo.attractor.Launcher.WIDTH;
 import static com.deo.attractor.Utils.Utils.fontChars;
+import static com.deo.attractor.Utils.Utils.formatNumber;
 import static com.deo.attractor.Utils.Utils.makeAScreenShot;
+import static com.deo.attractor.Utils.Utils.makeFilledRectangle;
 import static com.deo.attractor.Utils.Utils.rgbToRGBA8888;
-import static java.lang.StrictMath.abs;
 import static java.lang.StrictMath.max;
 import static java.lang.StrictMath.min;
 import static java.lang.StrictMath.random;
@@ -62,23 +61,22 @@ enum Palette {DEEP_BLUE, CHEMICAL_GREEN, DARK_PURPLE, FOREST_GREEN, ORANGE, RASP
 public class Attractor2D {
     
     private final RenderMode renderMode;
-    private final AttractorType attractorType;
+    private AttractorType attractorType;
     private Palette palette;
     float contrast = 0.5f;
+    float zoomContrast = 0.35f;
     
-    Vector4 attractorDimensions;
-    Vector2 attractorOffset;
+    AttractorDimensions attractorDimensions;
     
     final Array<Curve2D> curves;
     
     int[][] intensityMap;
-    int intensityMapMaxValue;
+    int intensityMapMaxValue = -1;
     Pixmap pixmap;
     Texture texture;
     
-    float copyOverThreadProgress;
-    
     boolean finished = false;
+    boolean showControls;
     
     private final BitmapFont font;
     
@@ -103,11 +101,17 @@ public class Attractor2D {
     
     float divisionPrecision = 100000000f;
     
+    boolean newAttractorAdded = false;
+    
+    long lastZoomTranslateTime;
+    boolean needIntensityMapUpdate;
+    
     Attractor2D(RenderMode renderMode, Stage stage, RuleSet ruleSet, AttractorType attractorType, Palette palette, int CPUThreads, int iterationsPerPosition, int startingPositionsPerThread, int GPUIterations, int GPUPointsDivider) {
         
         this.renderMode = renderMode;
         this.attractorType = attractorType;
         this.palette = palette;
+        showControls = renderMode.equals(GPU);
         
         allIterations = CPUThreads * iterationsPerPosition * startingPositionsPerThread;
         
@@ -123,69 +127,15 @@ public class Attractor2D {
         generator.dispose();
         font.getData().markupEnabled = true;
         
-        String[] constants;
-        float[] constants_numeric;
+        final float[] constants_numeric = getConstantsFromRuleSet(ruleSet);
         String[] bulkArgs = new String[]{"x = 0", "y = 0"};
-        switch (ruleSet) {
-            case DEFAULT:
-            default:
-                constants = new String[]{"a = -1.234039", "b = 1.497206", "c = 2.104149", "d = -0.930567"};
-                constants_numeric = new float[]{-1.234039f, 1.497206f, 2.104149f, -0.930567f};
-                break;
-            case PI:
-                constants = new String[]{"a = 3.141592", "b = 3.141592", "c = 3.141592", "d = 3.141592"};
-                constants_numeric = new float[]{3.141592f, 3.141592f, 3.141592f, 3.141592f};
-                break;
-            case PI2:
-                constants = new String[]{"a = 1.570796", "b = 1.570796", "c = 1.570796", "d = 6.283184"};
-                constants_numeric = new float[]{1.570796f, 1.570796f, 1.570796f, 6.283184f};
-                break;
-            case PI3:
-                constants = new String[]{"a = 3.141592", "b = 1.570796", "c = 3.141592", "d = 6.283184"};
-                constants_numeric = new float[]{3.141592f, 1.570796f, 3.141592f, 6.283184f};
-                break;
-            case PI4:
-                constants = new String[]{"a = 1.570796", "b = 6.283184", "c = 3.141592", "d = 1.570796"};
-                constants_numeric = new float[]{1.570796f, 6.283184f, 3.141592f, 1.570796f};
-                break;
-            case PI5:
-                constants = new String[]{"a = 6.283184", "b = 1.570796", "c = 1.570796", "d = 6.283184"};
-                constants_numeric = new float[]{6.283184f, 1.570796f, 1.570796f, 6.283184f};
-                break;
-            case POPCORN_DEFAULT:
-                constants = new String[]{"a = 0.8", "b = 3", "c = 0.8", "d = 3"};
-                constants_numeric = new float[]{0.8f, 3, 0.8f, 3};
-                break;
-        }
+        final String[] constants = new String[]{
+                "a = " + constants_numeric[0],
+                "b = " + constants_numeric[1],
+                "c = " + constants_numeric[2],
+                "d = " + constants_numeric[3]};
         
-        attractorOffset = new Vector2();
-        
-        switch (attractorType) {
-            case DE_JONG:
-                attractorDimensions = new Vector4(-1.9999981f, -1.9999995f, 1.9889168f, 1.2860358f);
-                break;
-            case SVENSSON:
-                attractorDimensions = new Vector4(-1.9305667f, -2.6320562f, 1.9305667f, 3.1041484f);
-                break;
-            case CLIFFORD:
-                attractorDimensions = new Vector4(-3.1041484f, -1.9305661f, 3.1041484f, 1.9202048f);
-                break;
-            case BOO:
-                attractorDimensions = new Vector4(-1.7690015f, -1.9999906f, 1.9999999f, 1.999998f);
-                break;
-            case P_GHOST:
-                attractorDimensions = new Vector4(-1.7813787f, -1.9999957f, 1.9999976f, 1.286116f);
-                break;
-            case PRODUCT:
-                attractorDimensions = new Vector4(-3.1415918f, -3.1415918f, 3.1415918f, 3.1415918f);
-                break;
-            case POPCORN:
-            case POPCORN2:
-                attractorDimensions = new Vector4(-constants_numeric[2], -constants_numeric[0], constants_numeric[2], constants_numeric[0]);
-                break;
-            default:
-                attractorDimensions = Vector4.Zero;
-        }
+        loadAttractorDimensions(constants_numeric);
         
         curves = new Array<>();
         if (renderMode.equals(CPU)) {
@@ -246,17 +196,10 @@ public class Attractor2D {
             
             ShaderProgram.pedantic = false;
             computeShader = new ShaderProgram(Gdx.files.internal("vertex.glsl"), Gdx.files.internal("fragment.glsl"));
-            computeShader.bind();
-            computeShader.setUniformi("ruleSet", attractorType.ordinal());
-            computeShader.setUniformi("u_sampler2D_y", 1);
-            computeShader.setUniformf("a", constants_numeric[0]);
-            computeShader.setUniformf("b", constants_numeric[1]);
-            computeShader.setUniformf("c", constants_numeric[2]);
-            computeShader.setUniformf("d", constants_numeric[3]);
+            updateShaderUniforms(constants_numeric);
             
-            computeBatch = new SpriteBatch();
+            computeBatch = new SpriteBatch(1000, computeShader);
             computeBatch.disableBlending();
-            computeBatch.setShader(computeShader);
             
             GPUCurve = new Curve2D(null, 0, 0);
             GPUValues = GPUCurve.points;
@@ -292,9 +235,7 @@ public class Attractor2D {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 contrast = contrastSlider.getValue();
-                valueText.setText("Contrast:" + (int) (contrast * 100) / 100f);
-                
-                updatePixmap();
+                valueText.setText("Contrast:" + formatNumber(2, contrast));
             }
         });
         
@@ -304,29 +245,48 @@ public class Attractor2D {
         holder.align(Align.left);
         holder.setBounds(-WIDTH / 2f + 15, -HEIGHT / 2f + 15, 550, 25);
         stage.addActor(holder);
-    
-        Pixmap pixmap = new Pixmap(100, 30, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.BLACK);
-        pixmap.fill();
-        TextureRegionDrawable BarBackgroundBlank = new TextureRegionDrawable(new TextureRegion(new Texture(pixmap)));
-        pixmap.dispose();
-    
-        Pixmap pixmap2 = new Pixmap(100, 30, Pixmap.Format.RGBA8888);
-        pixmap2.setColor(Color.valueOf("#000000AA"));
-        pixmap2.fill();
-        TextureRegionDrawable BarBackgroundGrey = new TextureRegionDrawable(new TextureRegion(new Texture(pixmap2)));
-        pixmap2.dispose();
-    
-        Pixmap pixmap3 = new Pixmap(100, 30, Pixmap.Format.RGBA8888);
-        pixmap3.setColor(Color.valueOf("#00000000"));
-        pixmap3.fill();
-        TextureRegionDrawable BarBackgroundEmpty = new TextureRegionDrawable(new TextureRegion(new Texture(pixmap3)));
-        pixmap3.dispose();
+        
+        final Slider[] constantSliders = new Slider[constants_numeric.length];
+        final Label[] constantLabels = new Label[constants_numeric.length];
+        
+        if (renderMode.equals(GPU)) {
+            for (int i = 0; i < constants.length; i++) {
+                final String[] vals = constants[i].replace(" ", "").split("=");
+                float constVal = Float.parseFloat(vals[vals.length - 1]);
+                
+                final Slider parameterSlider = new Slider(-7, 7, 0.01f, false, sliderStyle);
+                constantSliders[i] = parameterSlider;
+                parameterSlider.setValue(constVal);
+                final Label textLabel = new Label(vals[0] + ":" + formatNumber(2, constVal), new Label.LabelStyle(font, Color.WHITE));
+                constantLabels[i] = textLabel;
+                
+                final int finalI = i;
+                parameterSlider.addListener(new ChangeListener() {
+                    @Override
+                    public void changed(ChangeEvent event, Actor actor) {
+                        textLabel.setText(vals[0] + ":" + formatNumber(2, parameterSlider.getValue()));
+                        constants_numeric[finalI] = parameterSlider.getValue();
+                        reset(constants_numeric);
+                    }
+                });
+                
+                Table table = new Table();
+                table.add(textLabel);
+                table.add(parameterSlider).size(500, 25);
+                table.align(Align.right);
+                table.setBounds(0, i * 60 - HEIGHT / 2f + 25, 550, 25);
+                stage.addActor(table);
+            }
+        }
+        
+        TextureRegionDrawable BarBackgroundBlank = makeFilledRectangle(100, 30, Color.BLACK);
+        TextureRegionDrawable BarBackgroundGrey = makeFilledRectangle(100, 30, Color.valueOf("#000000AA"));
+        TextureRegionDrawable BarBackgroundEmpty = makeFilledRectangle(100, 30, Color.valueOf("#00000000"));
         
         SelectBox.SelectBoxStyle selectBoxStyle = new SelectBox.SelectBoxStyle(font, Color.WHITE, BarBackgroundBlank,
                 new ScrollPane.ScrollPaneStyle(BarBackgroundGrey, BarBackgroundEmpty, BarBackgroundEmpty, BarBackgroundEmpty, BarBackgroundEmpty),
                 new List.ListStyle(font, Color.CORAL, Color.SKY, BarBackgroundGrey));
-    
+        
         final SelectBox<Palette> paletteSelector = new SelectBox<>(selectBoxStyle);
         paletteSelector.setItems(Palette.values());
         paletteSelector.setSelected(palette);
@@ -334,36 +294,117 @@ public class Attractor2D {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 Attractor2D.this.palette = paletteSelector.getSelected();
-                updatePixmap();
             }
         });
         paletteSelector.setBounds(-WIDTH / 2f + 15, -HEIGHT / 2f + 55, 530, 25);
         stage.addActor(paletteSelector);
+        
+        if (renderMode.equals(GPU)) {
+            final SelectBox<RuleSet> ruleSetSelector = new SelectBox<>(selectBoxStyle);
+            ruleSetSelector.setItems(RuleSet.values());
+            ruleSetSelector.setSelected(ruleSet);
+            ruleSetSelector.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    float[] constants_numeric = getConstantsFromRuleSet(ruleSetSelector.getSelected());
+                    for (int i = 0; i < constants_numeric.length - 1; i++) {
+                        constantSliders[i].setProgrammaticChangeEvents(false);
+                        constantSliders[i].setValue(constants_numeric[i]);
+                        constantSliders[i].setProgrammaticChangeEvents(true);
+                        constantLabels[i].setText(constants[i].replace(" ", "").split("=")[0] + ":" + formatNumber(2, constants_numeric[i]));
+                    }
+                    constantSliders[constants_numeric.length - 1].setValue(constants_numeric[constants_numeric.length - 1]);
+                }
+            });
+            ruleSetSelector.setBounds(-WIDTH / 2f + 15, -HEIGHT / 2f + 85, 530, 25);
+            stage.addActor(ruleSetSelector);
+            
+            final SelectBox<AttractorType> attractorTypeSelector = new SelectBox<>(selectBoxStyle);
+            attractorTypeSelector.setItems(AttractorType.values());
+            attractorTypeSelector.setSelected(attractorType);
+            attractorTypeSelector.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    Attractor2D.this.attractorType = attractorTypeSelector.getSelected();
+                    loadAttractorDimensions(constants_numeric);
+                    reset(constants_numeric);
+                }
+            });
+            attractorTypeSelector.setBounds(-WIDTH / 2f + 15, -HEIGHT / 2f + 115, 530, 25);
+            stage.addActor(attractorTypeSelector);
+        }
     }
     
-    void translate(float amountX, float amountY){
-        attractorOffset.add(amountX / attractorDimensions.multiplier, amountY / attractorDimensions.multiplier);
-        for (int x = 0; x <= WIDTH; x++) {
-            for (int y = 0; y <= HEIGHT; y++) {
-                intensityMap[x][y] = 0;
-            }
-        }
-        updateIntensityMap();
-        updatePixmap();
+    void reset(float[] constants_numeric) {
+        clearIntensityMap();
+        computedIterations = 0;
+        intensityMapMaxValue = 0;
+        GPUCurve.points.clear();
+        GPUCurve.finished = false;
+        updateShaderUniforms(constants_numeric);
+        fillGPUBuffersWithRandomValues();
     }
     
-    void zoom(float amount){
-        attractorDimensions.changeMultiplier(amount);
-        for (int x = 0; x <= WIDTH; x++) {
-            for (int y = 0; y <= HEIGHT; y++) {
-                intensityMap[x][y] = 0;
-            }
+    float[] getConstantsFromRuleSet(RuleSet ruleSet) {
+        float[] constants_numeric;
+        switch (ruleSet) {
+            case DEFAULT:
+            default:
+                constants_numeric = new float[]{-1.234039f, 1.497206f, 2.104149f, -0.930567f};
+                break;
+            case PI:
+                constants_numeric = new float[]{3.141592f, 3.141592f, 3.141592f, 3.141592f};
+                break;
+            case PI2:
+                
+                constants_numeric = new float[]{1.570796f, 1.570796f, 1.570796f, 6.283184f};
+                break;
+            case PI3:
+                constants_numeric = new float[]{3.141592f, 1.570796f, 3.141592f, 6.283184f};
+                break;
+            case PI4:
+                constants_numeric = new float[]{1.570796f, 6.283184f, 3.141592f, 1.570796f};
+                break;
+            case PI5:
+                constants_numeric = new float[]{6.283184f, 1.570796f, 1.570796f, 6.283184f};
+                break;
+            case POPCORN_DEFAULT:
+                constants_numeric = new float[]{0.8f, 3, 0.8f, 3};
+                break;
         }
-        updateIntensityMap();
-        updatePixmap();
+        return constants_numeric;
+    }
+    
+    void fillGPUBuffersWithRandomValues() {
+        for (int i = 0; i < allPixels; i++) {
+            xValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+            yValuesGPU_current[i] = (float) ((random() - 0.5) * 4);
+        }
+    }
+    
+    void updateShaderUniforms(float[] constants_numeric) {
+        computeShader.bind();
+        computeShader.setUniformi("ruleSet", attractorType.ordinal());
+        computeShader.setUniformi("u_sampler2D_y", 1);
+        computeShader.setUniformf("a", constants_numeric[0]);
+        computeShader.setUniformf("b", constants_numeric[1]);
+        computeShader.setUniformf("c", constants_numeric[2]);
+        computeShader.setUniformf("d", constants_numeric[3]);
+    }
+    
+    void translateAndZoom(float amountX, float amountY, float amountZ) {
+        if (finished) {
+            attractorDimensions.translate(amountX, amountY, amountZ);
+            updateIntensityMap(3000000);
+            needIntensityMapUpdate = true;
+            lastZoomTranslateTime = System.nanoTime();
+        }
     }
     
     void updatePixmap() {
+        
+        float contrast = needIntensityMapUpdate ? zoomContrast : this.contrast;
+        
         int curveFunc = 0;
         if (Math.abs(contrast - .5) < .04) curveFunc = 1;
         else if (Math.abs(contrast - 1.0) < .04)
@@ -376,57 +417,103 @@ public class Attractor2D {
         }
     }
     
-    void updateIntensityMap(){
+    void loadAttractorDimensions(float[] constants_numeric) {
+        switch (attractorType) {
+            case DE_JONG:
+                attractorDimensions = new AttractorDimensions(-1.9999981f, -1.9999995f, 1.9889168f, 1.2860358f);
+                break;
+            case SVENSSON:
+                attractorDimensions = new AttractorDimensions(-1.9305667f, -2.6320562f, 1.9305667f, 3.1041484f);
+                break;
+            case CLIFFORD:
+                attractorDimensions = new AttractorDimensions(-3.1041484f, -1.9305661f, 3.1041484f, 1.9202048f);
+                break;
+            case BOO:
+                attractorDimensions = new AttractorDimensions(-1.7690015f, -1.9999906f, 1.9999999f, 1.999998f);
+                break;
+            case P_GHOST:
+                attractorDimensions = new AttractorDimensions(-1.7813787f, -1.9999957f, 1.9999976f, 1.286116f);
+                break;
+            case PRODUCT:
+                attractorDimensions = new AttractorDimensions(-3.1415918f, -3.1415918f, 3.1415918f, 3.1415918f);
+                break;
+            case POPCORN:
+            case POPCORN2:
+                attractorDimensions = new AttractorDimensions(-constants_numeric[2], -constants_numeric[0], constants_numeric[2], constants_numeric[0]);
+                break;
+            default:
+                newAttractorAdded = true;
+                attractorDimensions = new AttractorDimensions();
+                break;
+        }
+    }
+    
+    void getAttractorDimensions() {
         float minX = 100000, minY = 100000;
         float maxX = -100000, maxY = -100000;
-    
-        if (!attractorDimensions.equals(Vector4.Zero)) {
-            minX = attractorDimensions.x;
-            minY = attractorDimensions.y;
-            maxX = attractorDimensions.z;
-            maxY = attractorDimensions.w;
-        } else {
-            for (int i = 0; i < curves.size; i++) {
-                for (int p = 0; p < curves.get(i).points.size; p++) {
-                
-                    minX = min(minX, curves.get(i).points.get(p).x);
-                    minY = min(minY, curves.get(i).points.get(p).y);
-                
-                    maxX = max(maxX, curves.get(i).points.get(p).x);
-                    maxY = max(maxY, curves.get(i).points.get(p).y);
-                
-                    copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
-                }
-            }
-            attractorDimensions = new Vector4(minX, minY, maxX, maxY);
-        }
-        float width = maxX - minX;
-        float height = maxY - minY;
-    
-        float zoom = Math.max(height / (float) HEIGHT, width / (float) WIDTH);
-        float xOffset = WIDTH / 2f - width / zoom / 2f + attractorOffset.x;
-        float yOffset = HEIGHT / 2f - height / zoom / 2f + attractorOffset.y;
-    
         for (int i = 0; i < curves.size; i++) {
             for (int p = 0; p < curves.get(i).points.size; p++) {
-            
-                int translatedX = (int) ((curves.get(i).points.get(p).x - (minX < 0 ? minX : -minX)) / zoom + xOffset);
-                int translatedY = (int) ((curves.get(i).points.get(p).y - (minY < 0 ? minY : -minY)) / zoom + yOffset);
-            
-                try {
-                    intensityMap[translatedX][translatedY]++;
-                } catch (IndexOutOfBoundsException e) {
-                    //ignore
-                }
-                copyOverThreadProgress = (i * curves.get(0).points.size + p) / (float) (curves.size * curves.get(0).points.size);
+                minX = min(minX, curves.get(i).points.get(p).x);
+                minY = min(minY, curves.get(i).points.get(p).y);
+                
+                maxX = max(maxX, curves.get(i).points.get(p).x);
+                maxY = max(maxY, curves.get(i).points.get(p).y);
             }
         }
-        
+        attractorDimensions = new AttractorDimensions(minX, minY, maxX, maxY);
+    }
+    
+    void plotPoints(float[] pointsX, float[] pointsY) {
+        for (int i = 0; i < pointsX.length; i++) {
+            translateAndPlotToIntensityMap(pointsX[i], pointsY[i]);
+        }
+        updateIntensityMapMaxValue(false);
+    }
+    
+    void translateAndPlotToIntensityMap(float x, float y) {
+        try {
+            int translatedX = (int) ((x - attractorDimensions.minX) / attractorDimensions.zoom + attractorDimensions.offsetX);
+            int translatedY = (int) ((y - attractorDimensions.minY) / attractorDimensions.zoom + attractorDimensions.offsetY);
+            intensityMap[translatedX][translatedY]++;
+        } catch (IndexOutOfBoundsException e) {
+            //ignore
+        }
+    }
+    
+    void updateIntensityMapMaxValue(boolean resetToZero) {
+        if (resetToZero) {
+            intensityMapMaxValue = 0;
+        }
         for (int x = 0; x <= WIDTH; x++) {
             for (int y = 0; y <= HEIGHT; y++) {
                 intensityMapMaxValue = max(intensityMapMaxValue, intensityMap[x][y]);
             }
         }
+    }
+    
+    void clearIntensityMap() {
+        for (int x = 0; x <= WIDTH; x++) {
+            for (int y = 0; y <= HEIGHT; y++) {
+                intensityMap[x][y] = 0;
+            }
+        }
+    }
+    
+    void updateIntensityMap(int points) {
+        
+        clearIntensityMap();
+        
+        for (int i = 0; i < curves.size; i++) {
+            if (points == -1) {
+                points = curves.get(i).points.size;
+            } else {
+                points /= curves.size;
+            }
+            for (int p = 0; p < min(points, curves.get(i).points.size); p++) {
+                translateAndPlotToIntensityMap(curves.get(i).points.get(p).x, curves.get(i).points.get(p).y);
+            }
+        }
+        updateIntensityMapMaxValue(points == -1);
     }
     
     void startThreads() {
@@ -435,6 +522,35 @@ public class Attractor2D {
                 curves.get(i).startThread();
             }
         }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    updatePixmap();
+                }
+            }
+        }).start();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    if (needIntensityMapUpdate && System.nanoTime() - lastZoomTranslateTime > 1900000000L) {
+                        updateIntensityMap(-1);
+                        needIntensityMapUpdate = false;
+                    }
+                    if (Gdx.input.isKeyJustPressed(Input.Keys.C)) {
+                        getAttractorDimensions();
+                        updateIntensityMap(3000000);
+                        needIntensityMapUpdate = true;
+                    }
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -447,8 +563,14 @@ public class Attractor2D {
                         }
                     }
                 }
-                updateIntensityMap();
-                updatePixmap();
+                if (newAttractorAdded) {
+                    getAttractorDimensions();
+                    System.out.println("New attractor: " + attractorDimensions);
+                }
+                if (newAttractorAdded || renderMode.equals(CPU)) {
+                    updateIntensityMap(-1);
+                }
+                showControls = true;
                 Attractor2D.this.finished = true;
             }
         }).start();
@@ -517,11 +639,16 @@ public class Attractor2D {
         processAndDecodeData(true);
         
         for (int i = 0; i < xValuesGPU_current.length; i++) {
-            if (abs(xValuesGPU_current[i]) > 15) {
-                System.exit(0);
-            }
             GPUValues.add(new Vector2(xValuesGPU_current[i], yValuesGPU_current[i]));
         }
+        
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                plotPoints(xValuesGPU_current, yValuesGPU_current);
+            }
+        }).start();
+        
         computedIterations += allPixels;
     }
     
@@ -529,6 +656,7 @@ public class Attractor2D {
         int computedItersNow = computedIterations;
         
         if (renderMode.equals(GPU)) {
+            finished = GPUCurve.finished;
             if (computedIterations < allIterations) {
                 processOnGPU();
                 GPUCurve.progress = computedIterations / (float) allIterations;
@@ -537,9 +665,19 @@ public class Attractor2D {
             }
         }
         
+        if (!finished) {
+            renderer.begin(ShapeRenderer.ShapeType.Filled);
+            renderer.setColor(Color.BLACK);
+            renderer.rect(-WIDTH / 2f, -HEIGHT / 2f, WIDTH, HEIGHT);
+            renderer.end();
+        }
+        
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         texture.draw(pixmap, 0, 0);
+        if (newAttractorAdded) {
+            font.draw(batch, "NEW ATTRACTOR: " + attractorDimensions, 0, 0);
+        }
         batch.draw(texture, -WIDTH / 2f - 1, -HEIGHT / 2f - 1);
         batch.end();
         if (finished && Gdx.input.isKeyJustPressed(Input.Keys.S)) {
@@ -547,23 +685,20 @@ public class Attractor2D {
         }
         if (!finished) {
             
-            renderer.setProjectionMatrix(camera.combined);
-            renderer.begin(ShapeRenderer.ShapeType.Filled);
-            
-            renderer.setColor(Color.BLACK);
-            renderer.rect(-WIDTH / 2f, -HEIGHT / 2f, WIDTH, HEIGHT);
-            
-            float divWidth = min(WIDTH / (float) curves.size, WIDTH / 30f);
-            
-            for (int i = 0; i < curves.size; i++) {
-                renderer.setColor(new Color(1 - curves.get(i).progress, curves.get(i).progress, 0.3f, 1));
-                renderer.rect(-WIDTH / 2f + divWidth * i + 10, -HEIGHT / 2f, divWidth - 10, HEIGHT / 4f * curves.get(i).progress);
+            if (curves.size > 1) {
+                renderer.setProjectionMatrix(camera.combined);
+                renderer.begin(ShapeRenderer.ShapeType.Filled);
+                
+                float divWidth = min(WIDTH / (float) curves.size, WIDTH / 30f);
+                
+                for (int i = 0; i < curves.size; i++) {
+                    renderer.setColor(new Color(1 - curves.get(i).progress, curves.get(i).progress, 0.3f, 1));
+                    renderer.rect(-WIDTH / 2f + divWidth * i + 10, -HEIGHT / 2f, divWidth - 10, HEIGHT / 4f * curves.get(i).progress);
+                }
+                
+                renderer.end();
             }
             
-            renderer.setColor(Color.GOLDENROD);
-            renderer.rect(-WIDTH / 2f, HEIGHT / 2f - 15, WIDTH * copyOverThreadProgress, 15);
-            
-            renderer.end();
             batch.begin();
             
             int iterationsPerTick = computedIterations - computedItersNow;
@@ -588,12 +723,13 @@ public class Attractor2D {
             }
             iterationsSmoothed /= (float) computeIterationsPrev.size();
             deltaSmoothed /= (float) deltaPrev.size();
-            
+    
+            font.setColor(Color.WHITE);
             font.draw(batch,
                     "KIpS:" + (int) ((iterationsSmoothed / deltaSmoothed) / 1000)
                             + " Delta:" + (int) (deltaSmoothed * 1000) + "ms "
                             + (int) (computedIterations / (float) allIterations * 100) + "%",
-                    -WIDTH / 2f + 25, -HEIGHT / 2f + 25);
+                    -WIDTH / 2f + 25, HEIGHT / 2f - 25);
             batch.end();
         }
     }
@@ -626,9 +762,9 @@ public class Attractor2D {
             case FOREST_GREEN:
                 return rgbToRGBA8888(capTo255(value << 1), capTo255(value << 2), capTo255(value));
             case ORANGE:
-                return rgbToRGBA8888(capTo255(value << 2), capTo255(value << 1), capTo255(value));
+                return rgbToRGBA8888(capTo255(value << 2), capTo255((int) (value * 1.5f)), capTo255(value));
             case RASPBERRY:
-                return rgbToRGBA8888(capTo255(value << 2), capTo255(value), capTo255(value << 1));
+                return rgbToRGBA8888(capTo255(value << 2), capTo255(value), capTo255((int) (value * 1.5f)));
             case PALE_LIME:
                 return rgbToRGBA8888(capTo255(value << 1), capTo255(value << 1), capTo255(value));
             case PALE_PURPLE:

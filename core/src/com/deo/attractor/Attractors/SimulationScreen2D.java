@@ -19,6 +19,7 @@ public class SimulationScreen2D implements Screen {
     Attractor2D attractor2D;
     
     SpriteBatch batch;
+    SpriteBatch stageBatch;
     OrthographicCamera camera;
     ScreenViewport viewport;
     ShapeRenderer renderer;
@@ -31,17 +32,18 @@ public class SimulationScreen2D implements Screen {
         HEIGHT *= renderResolutionMultiplier;
         
         batch = new SpriteBatch();
+        stageBatch = new SpriteBatch();
         camera = new OrthographicCamera(WIDTH, HEIGHT);
         viewport = new ScreenViewport(camera);
         renderer = new ShapeRenderer();
         renderer.setAutoShapeType(true);
         
-        stage = new Stage(viewport, batch);
+        stage = new Stage(viewport, stageBatch);
         attractor2D = new Attractor2D(
                 RenderMode.GPU, stage,
-                RuleSet.POPCORN_DEFAULT,
-                AttractorType.POPCORN,
-                Palette.ORANGE,
+                RuleSet.PI,
+                AttractorType.BOO,
+                Palette.RASPBERRY,
                 20,
                 5000, 256 * 4,
                 50, 2);
@@ -63,7 +65,7 @@ public class SimulationScreen2D implements Screen {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         attractor2D.render(batch, camera, renderer, delta);
-        if (attractor2D.finished) {
+        if (attractor2D.showControls) {
             stage.draw();
             stage.act(delta);
         }
@@ -139,7 +141,7 @@ class AttractorController implements InputProcessor {
     
     @Override
     public boolean touchDragged(int screenX, int screenY, int pointer) {
-        attractor2D.translate((screenX - lastScreenX), (screenY - lastScreenY));
+        attractor2D.translateAndZoom((screenX - lastScreenX), (screenY - lastScreenY), 0);
         lastScreenX = screenX;
         lastScreenY = screenY;
         return false;
@@ -152,7 +154,7 @@ class AttractorController implements InputProcessor {
     
     @Override
     public boolean scrolled(float amountX, float amountY) {
-        attractor2D.zoom(amountY / 100f);
+        attractor2D.translateAndZoom(0, 0, amountY / 25f);
         return false;
     }
 }
