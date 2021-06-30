@@ -1,0 +1,240 @@
+{
+  "minMaxLimits": [-7, 7],
+  "Attractors": {
+    "DE_JONG": {
+      "displayName": "De Jong",
+      "rules": [
+        "sin(a0*y) - cos(a1*x)",
+        "sin(a2*x) - cos(a3*y)"
+      ],
+      "variableCount": 4,
+      "defaultVariables": "DEFAULT",
+      "dimensions": [-1.9999981, -1.9999995, 1.9889168, 1.2860358],
+      "contrast": 0.45
+    },
+    "SVENSSON": {
+      "displayName": "Svensson",
+      "rules": [
+        "a3 * sin(a0*x) - sin(a1*y)",
+        "a2 * cos(a0*x) + cos(a1*y)"
+      ],
+      "variableCount": 4,
+      "defaultVariables": "DEFAULT",
+      "dimensions": [-1.9305667, -2.6320562, 1.9305667, 3.1041484],
+      "contrast": 0.63
+    },
+    "CLIFFORD": {
+      "displayName": "Clifford",
+      "rules": [
+        "sin(a0*y) + a2*cos(a0*x)",
+        "sin(a1*x) + a3*cos(a1*y)"
+      ],
+      "variableCount": 4,
+      "defaultVariables": "DEFAULT",
+      "dimensions": [-3.1041484, -1.9305661, 3.1041484, 1.9202048],
+      "contrast": 0.63
+    },
+    "BOO": {
+      "displayName": "Boo",
+      "rules": [
+        "cos(a0*y) + cos(a1*x)",
+        "sin(a2*x) + sin(a3*y)"
+      ],
+      "variableCount": 4,
+      "defaultVariables": [0.51, 6, 3, 1.51],
+      "dimensions": [-1.7690015, -1.9999906, 1.9999999, 1.999998],
+      "contrast": 0.45
+    },
+    "GHOST": {
+      "displayName": "Ghost",
+      "rules": [
+        "cos(a0*y) - sin(a1*x)",
+        "sin(a2*x) - cos(a3*y)"
+      ],
+      "variableCount": 4,
+      "defaultVariables": [0, 1.3, 3.0, 2.61],
+      "dimensions": [-1.7813787, -1.9999957, 1.9999976, 1.286116],
+      "contrast": 0.39
+    },
+    "PRODUCT": {
+      "displayName": "Product",
+      "rules": [
+        "3.1415926 * sin(a0*y) * cos(a1*x)",
+        "3.1415926 * sin(a2*x) * cos(a3*y)"
+      ],
+      "variableCount": 4,
+      "defaultVariables": [0, 1.3, 3.0, 2.61],
+      "dimensions": [-3.1415918, -3.1415918, 3.1415918, 3.1415918],
+      "contrast": 0.89
+    },
+    "POPCORN": {
+      "displayName": "Popcorn",
+      "rules": [
+        "a2*sin(y + tan(a3*y))",
+        "a0*sin(x + tan(a1*x))"
+      ],
+      "variableCount": 4,
+      "defaultVariables": "POPCORN_DEFAULT",
+      "dimensions": [-0.8, -0.8, 0.8, 0.8],
+      "contrast": 0.45
+    },
+    "POPCORN2": {
+      "displayName": "Popcorn v2",
+      "rules": [
+        "a2*sin(y + tan(a3*x))",
+        "a0*sin(x + tan(a1*y))"
+      ],
+      "variableCount": 4,
+      "defaultVariables": "POPCORN_DEFAULT",
+      "dimensions": [-0.8, -0.8, 0.8, 0.8],
+      "contrast": 0.45
+    },
+    "POLYNOMIAL": {
+      "displayName": "Polynomial 12",
+      "rules": [
+        "a0 + a1*x + a2 * x * x + a3 * x * y + a4 * y + a5 * y * y",
+        "a6 + a7*x + a8 * x * x + a9 * x * y + a10 * y + a11 * y * y"
+      ],
+      "variableCount": 12,
+      "defaultVariables": "POLYNOMIAL_FLOWER",
+      "dimensions": [-4, -4, 4, 4],
+      "contrast": 0.5
+    }
+  },
+  "VarSets": {
+    "DEFAULT": {
+      "displayName": "Default",
+      "variables": [-1.234039, 1.497206, 2.104149, -0.930567]
+    },
+    "PI": {
+      "displayName": "PI",
+      "variables": [3.141592, 3.141592, 3.141592, 3.141592]
+    },
+    "PI2": {
+      "displayName": "PI/2, PI*2",
+      "variables": [1.570796, 1.570796, 1.570796, 6.283184]
+    },
+    "PI3": {
+      "displayName": "PI, PI/2, PI*2",
+      "variables": [3.141592, 1.570796, 3.141592, 6.283184]
+    },
+    "PI4": {
+      "displayName": "PI/2, PI*2, PI",
+      "variables": [1.570796, 6.283184, 3.141592, 1.570796]
+    },
+    "PI5": {
+      "displayName": "PI*2 PI/2",
+      "variables": [6.283184, 1.570796, 1.570796, 6.283184]
+    },
+    "POPCORN_DEFAULT": {
+      "displayName": "Popcorn default",
+      "variables": [0.8, 3, 0.8, 3]
+    },
+    "POLYNOMIAL_GALAXY": {
+      "displayName": "Galaxy",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "GLXOESFTTPSV"
+    },
+    "POLYNOMIAL_FLOWER": {
+      "displayName": "Flower",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "MCRBIPOPHTBN"
+    },
+    "POLYNOMIAL_DROPLET": {
+      "displayName": "Droplet",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "VBWNBDELYHUL"
+    },
+    "POLYNOMIAL_FLOWER2": {
+      "displayName": "Flower v2",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "FIRCDERRPVLD"
+    },
+    "POLYNOMIAL_EGG": {
+      "displayName": "Egg",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "QFFVSLMJJCCR"
+    },
+    "POLYNOMIAL_CORKSCREW": {
+      "displayName": "Cork screw",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "LUFBBFISGJYS"
+    },
+    "POLYNOMIAL_TRIANGLE": {
+      "displayName": "Triangle",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "EJYDREGLYQPV"
+    },
+    "POLYNOMIAL_SPIKES": {
+      "displayName": "Spikes",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "HIYIWHOKNVCG"
+    },
+    "POLYNOMIAL_STRING": {
+      "displayName": "String",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "MSSSRRPADDSO"
+    },
+    "POLYNOMIAL_SKEWED_TRIANGLE": {
+      "displayName": "Skewed triangle",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "OIHVGHAHGYRK"
+    },
+    "POLYNOMIAL_BLACK_HOLE": {
+      "displayName": "Black hole",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "RALLTIOBDULT"
+    },
+    "POLYNOMIAL_HORN": {
+      "displayName": "Horn",
+      "minLimit": -1.2,
+      "step": 0.1,
+      "variables": "WJJFXGXHTRPG"
+    }
+  },
+  "Palettes": {
+    "DEEP_BLUE": {
+      "displayName": "Deep blue",
+      "rgbMultipliers": [1, 2, 4]
+    },
+    "CHEMICAL_GREEN": {
+      "displayName": "Chemical green",
+      "rgbMultipliers": [1, 4, 2]
+    },
+    "DARK_PURPLE": {
+      "displayName": "Dark purple",
+      "rgbMultipliers": [2, 1, 4]
+    },
+    "FOREST_GREEN": {
+      "displayName": "Forest green",
+      "rgbMultipliers": [2, 4, 1]
+    },
+    "ORANGE": {
+      "displayName": "Orange",
+      "rgbMultipliers": [4, 1.5, 1]
+    },
+    "RASPBERRY": {
+      "displayName": "Raspberry",
+      "rgbMultipliers": [4, 1, 1.5]
+    },
+    "PALE_LIME": {
+      "displayName": "Pale lime",
+      "rgbMultipliers": [2, 2, 1]
+    },
+    "PALE_PURPLE": {
+      "displayName": "Pale purple",
+      "rgbMultipliers": [2, 1, 2]
+    }
+  }
+}

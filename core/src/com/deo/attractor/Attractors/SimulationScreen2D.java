@@ -39,15 +39,7 @@ public class SimulationScreen2D implements Screen {
         renderer.setAutoShapeType(true);
         
         stage = new Stage(viewport, stageBatch);
-        attractor2D = new Attractor2D(
-                RenderMode.GPU, stage,
-                RuleSet.PI,
-                AttractorType.BOO,
-                Palette.RASPBERRY,
-                20,
-                5000, 256 * 4,
-                50, 2);
-        attractor2D.startThreads();
+        attractor2D = new Attractor2D(stage, 50, 2);
         InputMultiplexer multiplexer = new InputMultiplexer();
         AttractorController attractorController = new AttractorController(attractor2D);
         multiplexer.addProcessor(stage);
@@ -65,10 +57,8 @@ public class SimulationScreen2D implements Screen {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         attractor2D.render(batch, camera, renderer, delta);
-        if (attractor2D.showControls) {
-            stage.draw();
-            stage.act(delta);
-        }
+        stage.draw();
+        stage.act(delta);
     }
     
     @Override

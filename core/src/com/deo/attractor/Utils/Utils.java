@@ -20,7 +20,7 @@ import static java.lang.StrictMath.sin;
 public class Utils {
     
     public final static String fontChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890\"!`?'.,;:()[]{}<>|/@\\^$€-%+=#_&~*ёйцукенгшщзхъэждлорпавыфячсмитьбюЁЙЦУКЕНГШЩЗХЪЭЖДЛОРПАВЫФЯЧСМИТЬБЮ";
-    
+    public final static String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     public static Color[][] availablePalettes = new Color[][]{
             {Color.CLEAR, Color.ORANGE, Color.CYAN, Color.CORAL},
             {Color.CLEAR, Color.valueOf("#662341"), Color.valueOf("#ffe240"), Color.FIREBRICK},

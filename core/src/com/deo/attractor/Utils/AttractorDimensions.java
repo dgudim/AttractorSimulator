@@ -27,7 +27,15 @@ public class AttractorDimensions {
     
     public float multiplier = 1;
     
-    public AttractorDimensions(){
+    public AttractorDimensions(float[] dimensions){
+        minX = dimensions[0];
+        minY = dimensions[1];
+        maxX = dimensions[2];
+        maxY = dimensions[3];
+        origMinX = dimensions[0];
+        origMinY = dimensions[1];
+        origMaxX = dimensions[2];
+        origMaxY = dimensions[3];
         calculate();
     }
     
