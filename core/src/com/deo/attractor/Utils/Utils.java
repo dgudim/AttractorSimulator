@@ -15,6 +15,7 @@ import java.util.ArrayList;
 
 import static java.lang.StrictMath.PI;
 import static java.lang.StrictMath.pow;
+import static java.lang.StrictMath.round;
 import static java.lang.StrictMath.sin;
 
 public class Utils {
@@ -113,8 +114,8 @@ public class Utils {
         return samples;
     }
     
-    public static float formatNumber(int digits, float value){
-        return (int) (value * pow(10, digits)) / (float)pow(10, digits);
+    public static float formatNumber(int digits, double value){
+        return (float) (round(value * pow(10, digits)) / (double)pow(10, digits));
     }
     
 }

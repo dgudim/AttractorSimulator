@@ -57,8 +57,10 @@ public class SimulationScreen2D implements Screen {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         attractor2D.render(batch, camera, renderer, delta);
-        stage.draw();
-        stage.act(delta);
+        if(attractor2D.showUI){
+            stage.draw();
+            stage.act(delta);
+        }
     }
     
     @Override

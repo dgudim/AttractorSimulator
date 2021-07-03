@@ -6,15 +6,15 @@ import static java.lang.Math.max;
 
 public class AttractorDimensions {
     
-    public float minX = -4;
-    public float minY = -4;
-    public float maxX = 4;
-    public float maxY = 4;
+    public float minX;
+    public float minY;
+    public float maxX;
+    public float maxY;
     
-    public float origMinX = -4;
-    public float origMinY = -4;
-    public float origMaxX = 4;
-    public float origMaxY = 4;
+    public float origMinX;
+    public float origMinY;
+    public float origMaxX;
+    public float origMaxY;
     
     public float height;
     public float width;
