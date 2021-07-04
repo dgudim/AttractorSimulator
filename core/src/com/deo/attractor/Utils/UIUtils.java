@@ -2,9 +2,15 @@ package com.deo.attractor.Utils;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle;
@@ -13,11 +19,17 @@ import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Slider;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
+import com.badlogic.gdx.utils.Align;
 
+import static com.badlogic.gdx.math.MathUtils.clamp;
 import static com.deo.attractor.Utils.Utils.fontChars;
+import static com.deo.attractor.Utils.Utils.formatNumber;
 import static com.deo.attractor.Utils.Utils.makeFilledRectangle;
 
 public class UIUtils {
@@ -29,6 +41,9 @@ public class UIUtils {
     public CheckBox.CheckBoxStyle checkBoxStyle;
     public TextButtonStyle textButtonStyle;
     public LabelStyle labelStyle;
+    public Button.ButtonStyle plusButtonStyle;
+    
+    public boolean forceUseProgrammaticEvents = false;
     
     public UIUtils() {
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("font.ttf"));
@@ -52,7 +67,7 @@ public class UIUtils {
         sliderStyle.knob.setMinHeight(30);
         sliderStyle.knobDown.setMinHeight(30);
         sliderStyle.knobOver.setMinHeight(30);
-    
+        
         textFieldStyle = new TextField.TextFieldStyle();
         textFieldStyle.background = makeFilledRectangle(100, 30, Color.CLEAR);
         textFieldStyle.cursor = makeFilledRectangle(3, 30, Color.WHITE);
@@ -88,6 +103,11 @@ public class UIUtils {
         textButtonStyle.overFontColor = Color.valueOf("#3D5232");
         textButtonStyle.fontColor = Color.valueOf("#22370E");
         
+        plusButtonStyle = new Button.ButtonStyle();
+        plusButtonStyle.up = new TextureRegionDrawable(new Texture(Gdx.files.internal("plus_dark_gray.png")));
+        plusButtonStyle.over = new TextureRegionDrawable(new Texture(Gdx.files.internal("plus_gray.png")));
+        plusButtonStyle.down = new TextureRegionDrawable(new Texture(Gdx.files.internal("plus.png")));
+        
         labelStyle = new Label.LabelStyle(font, Color.WHITE);
         
         TextureRegionDrawable BarBackgroundGrey = makeFilledRectangle(100, 30, Color.valueOf("#000000AA"));
@@ -98,7 +118,68 @@ public class UIUtils {
                 new List.ListStyle(font, Color.CORAL, Color.SKY, BarBackgroundGrey));
         
         selectBoxStyle.overFontColor = Color.WHITE;
+        
+    }
     
+    public Slider addSliderWithEditableLabel(final float[] sliderLimits, float defaultValue, TextField.TextFieldFilter textFieldFilter, final ChangeListener textFieldChangeListener, Stage stage, Group group, float x, float y, float width, float height) {
+        final Slider slider = new Slider(sliderLimits[0], sliderLimits[1], 0.01f, false, sliderStyle);
+        slider.setValue(defaultValue);
+        final TextField textLabel = new TextField("" + formatNumber(2, defaultValue), textFieldStyle);
+        textLabel.setTextFieldFilter(textFieldFilter);
+        final boolean[] userInteracted = {false};
+        slider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                if(userInteracted[0] || forceUseProgrammaticEvents){
+                    textLabel.setText("" + formatNumber(2, slider.getValue()));
+                }
+            }
+        });
+        slider.addListener(new ClickListener() {
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                userInteracted[0] = true;
+                return super.touchDown(event, x, y, pointer, button);
+            }
+            
+            @Override
+            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+                userInteracted[0] = false;
+                super.touchUp(event, x, y, pointer, button);
+            }
+        });
+        textLabel.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                if(!userInteracted[0] && !forceUseProgrammaticEvents){
+                    try {
+                        float value = Float.parseFloat(textLabel.getText());
+                        if(value > sliderLimits[1] || value < sliderLimits[0]){
+                            textLabel.setText(""+clamp(value ,sliderLimits[0], sliderLimits[1]));
+                            textLabel.setCursorPosition(textLabel.getText().length());
+                        }
+                        slider.setValue(value);
+                    } catch (Exception e) {
+                        //ignore
+                    }
+                }
+                if(!(textFieldChangeListener == null)){
+                    textFieldChangeListener.changed(event, actor);
+                }
+            }
+        });
+        Table table = new Table();
+        table.add(textLabel);
+        table.add(slider).size(width, height);
+        table.align(Align.right);
+        table.setBounds(x, y, width + 50, height);
+        if(!(stage == null)){
+            stage.addActor(table);
+        }
+        if(!(group == null)){
+            group.addActor(table);
+        }
+        return slider;
     }
     
 }

@@ -13,6 +13,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 
 import java.util.ArrayList;
 
+import static com.badlogic.gdx.math.MathUtils.clamp;
 import static java.lang.StrictMath.PI;
 import static java.lang.StrictMath.pow;
 import static java.lang.StrictMath.round;
@@ -30,7 +31,7 @@ public class Utils {
             {Color.CLEAR, Color.SKY, Color.SKY, Color.CLEAR, Color.CLEAR, Color.TEAL, Color.TEAL, Color.CLEAR}};
     
     public static int interpolate(double step, double maxValue, Color... colors) {
-        step = Math.max(Math.min(step / maxValue, 1.0f), 0.0f);
+        step = clamp(step/maxValue, 0.0d, 1.0d);
         
         switch (colors.length) {
             case 0:
@@ -40,7 +41,7 @@ public class Utils {
                 return Color.argb8888(colors[0]);
             
             case 2:
-                return mixTwoColors(colors[0], colors[1], (float) step);
+                return mixTwoColors(colors[0], colors[1], step);
             
             default:
                 
@@ -51,7 +52,7 @@ public class Utils {
                 }
                 
                 // stepAtFirstColorIndex will be a bit smaller than step
-                float stepAtFirstColorIndex = (float) firstColorIndex
+                double stepAtFirstColorIndex = (double) firstColorIndex
                         / (colors.length - 1);
                 
                 // multiply to increase values to range between 0.0f and 1.0f
@@ -59,13 +60,18 @@ public class Utils {
                         * (colors.length - 1);
                 
                 return mixTwoColors(colors[firstColorIndex],
-                        colors[firstColorIndex + 1], (float) localStep);
+                        colors[firstColorIndex + 1], localStep);
         }
         
     }
     
-    public static int mixTwoColors(Color color1, Color color2, float ratio) {
-        return Color.rgba8888(color1.r * (1f - ratio) + color2.r * ratio, color1.g * (1f - ratio) + color2.g * ratio, color1.b * (1f - ratio) + color2.b * ratio, color1.a * (1f - ratio) + color2.a * ratio);
+    public static int mixTwoColors(Color color1, Color color2, double ratio) {
+        ratio = clamp(ratio, 0, 1);
+        return Color.rgba8888(
+                (float) (color1.r * (1d - ratio) + color2.r * ratio),
+                (float) (color1.g * (1d - ratio) + color2.g * ratio),
+                (float) (color1.b * (1d - ratio) + color2.b * ratio),
+                (float) (color1.a * (1d - ratio) + color2.a * ratio));
     }
     
     public static int rgbToRGBA8888(int r, int g, int b) {
@@ -115,7 +121,7 @@ public class Utils {
     }
     
     public static float formatNumber(int digits, double value){
-        return (float) (round(value * pow(10, digits)) / (double)pow(10, digits));
+        return (float) (round(value * pow(10, digits)) / pow(10, digits));
     }
     
 }

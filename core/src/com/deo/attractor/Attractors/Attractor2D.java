@@ -17,6 +17,7 @@ import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.ui.Button;
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
@@ -86,6 +87,8 @@ public class Attractor2D {
     private final Array<Float> deltaPrev = new Array<>();
     private int computedIterations;
     private final int allIterations;
+    private float iterationCutOff = 0.99f;
+    private float[] rgbMultipliers;
     
     private double[] variables;
     private double[] startFrom = new double[]{};
@@ -97,7 +100,6 @@ public class Attractor2D {
     private final Label renderInfo;
     private final Group uiGroup;
     private Slider[] variableSliders;
-    private TextField[] variableSliderLabels;
     private final SpriteBatch computeBatch;
     private final Pixmap computePixmap_x;
     private final Pixmap computePixmap_y;
@@ -183,6 +185,58 @@ public class Attractor2D {
             }
         });
         
+        uiGroup = new Group();
+        
+        final Slider iterationCutOffSlider = uiUtils.addSliderWithEditableLabel(new float[]{0.1f, 1}, iterationCutOff,
+                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 235, 500, 25);
+        rgbMultipliers = palettes.get(currentPalette).get("rgbMultipliers").asFloatArray();
+        final Slider redValueSlider = uiUtils.addSliderWithEditableLabel(new float[]{0, 6}, rgbMultipliers[0],
+                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 185, 500, 25);
+        final Slider greenValueSlider = uiUtils.addSliderWithEditableLabel(new float[]{0, 6}, rgbMultipliers[1],
+                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 135, 500, 25);
+        final Slider blueValueSlider = uiUtils.addSliderWithEditableLabel(new float[]{0, 6}, rgbMultipliers[2],
+                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 85, 500, 25);
+        iterationCutOffSlider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                iterationCutOff = iterationCutOffSlider.getValue();
+                reset();
+            }
+        });
+        redValueSlider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                rgbMultipliers[0] = redValueSlider.getValue();
+            }
+        });
+        greenValueSlider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                rgbMultipliers[1] = greenValueSlider.getValue();
+            }
+        });
+        blueValueSlider.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                rgbMultipliers[2] = blueValueSlider.getValue();
+            }
+        });
+        iterationCutOffSlider.setVisible(false);
+        redValueSlider.setVisible(false);
+        greenValueSlider.setVisible(false);
+        blueValueSlider.setVisible(false);
+        Button plusButton = new Button(uiUtils.plusButtonStyle);
+        plusButton.setBounds(-WIDTH / 2f + 450, -HEIGHT / 2f + 50, 35, 35);
+        plusButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                iterationCutOffSlider.setVisible(!iterationCutOffSlider.isVisible());
+                redValueSlider.setVisible(!redValueSlider.isVisible());
+                greenValueSlider.setVisible(!greenValueSlider.isVisible());
+                blueValueSlider.setVisible(!blueValueSlider.isVisible());
+            }
+        });
+        
         final SelectBox<String> paletteSelector = new SelectBox<>(uiUtils.selectBoxStyle);
         paletteSelector.setItems(availablePalettes_displayNames);
         paletteSelector.setSelectedIndex(currentPalette);
@@ -190,6 +244,7 @@ public class Attractor2D {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 currentPalette = paletteSelector.getSelectedIndex();
+                loadColorPalette(redValueSlider, greenValueSlider, blueValueSlider);
             }
         });
         paletteSelector.setBounds(-WIDTH / 2f + 15, -HEIGHT / 2f + 55, 530, 25);
@@ -402,8 +457,8 @@ public class Attractor2D {
         });
         attractorTypeSelector.setBounds(-WIDTH / 2f + 15, -HEIGHT / 2f + 115, 530, 25);
         
-        uiGroup = new Group();
         uiGroup.addActor(paletteSelector);
+        uiGroup.addActor(plusButton);
         uiGroup.addActor(contrastSliderTable);
         uiGroup.addActor(textToRuleConverter);
         uiGroup.addActor(attractorTypeSelector);
@@ -467,50 +522,27 @@ public class Attractor2D {
         stage.addActor(uiGroup);
         
         variableSliders = new Slider[variables.length];
-        variableSliderLabels = new TextField[variables.length];
         
         for (int i = 0; i < variables.length; i++) {
-            float[] sliderLimits = attractors.get(currentAttractor).get("variableLimits").asFloatArray();
-            final Slider parameterSlider = new Slider(sliderLimits[0], sliderLimits[1], 0.01f, false, uiUtils.sliderStyle);
-            variableSliders[i] = parameterSlider;
-            parameterSlider.setValue((float) variables[i]);
-            final TextField textLabel = new TextField("" + formatNumber(2, variables[i]), uiUtils.textFieldStyle);
-            variableSliderLabels[i] = textLabel;
-            
             final int finalI = i;
-            parameterSlider.addListener(new ChangeListener() {
+            variableSliders[i] = uiUtils.addSliderWithEditableLabel(
+                    attractors.get(currentAttractor).get("variableLimits").asFloatArray(),
+                    (float) variables[i], new DigitFilter(true, true), new ChangeListener() {
+                        @Override
+                        public void changed(ChangeEvent event, Actor actor) {
+                            reset();
+                        }
+                    }, stage, null,
+                    WIDTH / 2f - 555, i * 60 - HEIGHT / 2f + 25, 500, 25);
+            variableSliders[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    textLabel.setText("" + formatNumber(2, parameterSlider.getValue()));
-                    variables[finalI] = parameterSlider.getValue();
-                    reset();
-                }
-            });
-            textLabel.setTextFieldFilter(new DigitFilter(true, true));
-            textLabel.setProgrammaticChangeEvents(false);
-            textLabel.addListener(new ChangeListener() {
-                @Override
-                public void changed(ChangeEvent event, Actor actor) {
-                    parameterSlider.setProgrammaticChangeEvents(false);
-                    float value = parameterSlider.getValue();
-                    try {
-                        value = Float.parseFloat(textLabel.getText());
-                    } catch (Exception e) {
-                        //ignore
+                    if (variableSliders[finalI].isDragging()) {
+                        variables[finalI] = variableSliders[finalI].getValue();
+                        reset();
                     }
-                    variables[finalI] = value;
-                    parameterSlider.setValue(value);
-                    parameterSlider.setProgrammaticChangeEvents(true);
-                    reset();
                 }
             });
-            
-            Table table = new Table();
-            table.add(textLabel);
-            table.add(parameterSlider).size(500, 25);
-            table.align(Align.right);
-            table.setBounds(WIDTH / 2f - 555, i * 60 - HEIGHT / 2f + 25, 550, 25);
-            stage.addActor(table);
         }
         
         int attractorVarCount = attractors.get(currentAttractor).getInt("variableCount");
@@ -547,10 +579,9 @@ public class Attractor2D {
     
     void updateSliderValues() {
         for (int i = 0; i < variables.length; i++) {
-            variableSliders[i].setProgrammaticChangeEvents(false);
+            uiUtils.forceUseProgrammaticEvents = true;
             variableSliders[i].setValue((float) variables[i]);
-            variableSliders[i].setProgrammaticChangeEvents(true);
-            variableSliderLabels[i].setText("" + formatNumber(2, variables[i]));
+            uiUtils.forceUseProgrammaticEvents = false;
         }
     }
     
@@ -859,16 +890,17 @@ public class Attractor2D {
         processAndDecodeData(false);
         processAndDecodeData(true);
         
-        for (int i = 0; i < xValues_current.length; i++) {
-            points.add(new Vector2(xValues_current[i], yValues_current[i]));
-        }
-        
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                plotPoints(xValues_current, yValues_current);
+        if (computedIterations >= allIterations * (1 - iterationCutOff)) {
+            for (int i = 0; i < xValues_current.length; i++) {
+                points.add(new Vector2(xValues_current[i], yValues_current[i]));
             }
-        }).start();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    plotPoints(xValues_current, yValues_current);
+                }
+            }).start();
+        }
         
         computedIterations += allPixels;
     }
@@ -975,12 +1007,20 @@ public class Attractor2D {
         }
     }
     
-    public static int capTo255(int a) {
+    private int capTo255(int a) {
         return Math.min(a, 255);
     }
     
-    public int colorFunc(int value) {
-        float[] rgbMultipliers = palettes.get(currentPalette).get("rgbMultipliers").asFloatArray();
+    private void loadColorPalette(Slider redSlider, Slider greenSlider, Slider blueSlider) {
+        rgbMultipliers = palettes.get(currentPalette).get("rgbMultipliers").asFloatArray();
+        uiUtils.forceUseProgrammaticEvents = true;
+        redSlider.setValue(rgbMultipliers[0]);
+        greenSlider.setValue(rgbMultipliers[1]);
+        blueSlider.setValue(rgbMultipliers[2]);
+        uiUtils.forceUseProgrammaticEvents = false;
+    }
+    
+    private int colorFunc(int value) {
         return rgbToRGBA8888(
                 capTo255((int) (value * rgbMultipliers[0])),
                 capTo255((int) (value * rgbMultipliers[1])),
