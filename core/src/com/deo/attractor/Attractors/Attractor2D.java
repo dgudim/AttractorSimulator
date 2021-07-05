@@ -537,7 +537,9 @@ public class Attractor2D {
             variableSliders[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    variables[finalI] = variableSliders[finalI].getValue();
+                    if (!rendering) {
+                        variables[finalI] = variableSliders[finalI].getValue();
+                    }
                     if (variableSliders[finalI].isDragging()) {
                         reset();
                     }
