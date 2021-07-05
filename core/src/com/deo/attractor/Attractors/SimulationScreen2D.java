@@ -26,10 +26,7 @@ public class SimulationScreen2D implements Screen {
     
     Stage stage;
     
-    public SimulationScreen2D(int renderResolutionMultiplier) {
-        
-        WIDTH *= renderResolutionMultiplier;
-        HEIGHT *= renderResolutionMultiplier;
+    public SimulationScreen2D() {
         
         batch = new SpriteBatch();
         stageBatch = new SpriteBatch();

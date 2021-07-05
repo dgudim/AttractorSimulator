@@ -13,6 +13,8 @@ public class DesktopLauncher {
 		
 		config.width = WIDTH;
 		config.height = HEIGHT;
+		config.foregroundFPS = 0;
+		config.backgroundFPS = 0;
 		config.fullscreen = true;
 		config.resizable = false;
 		
