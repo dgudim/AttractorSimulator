@@ -537,8 +537,8 @@ public class Attractor2D {
             variableSliders[i].addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
+                    variables[finalI] = variableSliders[finalI].getValue();
                     if (variableSliders[finalI].isDragging()) {
-                        variables[finalI] = variableSliders[finalI].getValue();
                         reset();
                     }
                 }
@@ -579,9 +579,7 @@ public class Attractor2D {
     
     void updateSliderValues() {
         for (int i = 0; i < variables.length; i++) {
-            uiUtils.forceUseProgrammaticEvents = true;
             variableSliders[i].setValue((float) variables[i]);
-            uiUtils.forceUseProgrammaticEvents = false;
         }
     }
     
@@ -1013,11 +1011,9 @@ public class Attractor2D {
     
     private void loadColorPalette(Slider redSlider, Slider greenSlider, Slider blueSlider) {
         rgbMultipliers = palettes.get(currentPalette).get("rgbMultipliers").asFloatArray();
-        uiUtils.forceUseProgrammaticEvents = true;
         redSlider.setValue(rgbMultipliers[0]);
         greenSlider.setValue(rgbMultipliers[1]);
         blueSlider.setValue(rgbMultipliers[2]);
-        uiUtils.forceUseProgrammaticEvents = false;
     }
     
     private int colorFunc(int value) {

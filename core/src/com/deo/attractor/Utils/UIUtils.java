@@ -43,8 +43,6 @@ public class UIUtils {
     public LabelStyle labelStyle;
     public Button.ButtonStyle plusButtonStyle;
     
-    public boolean forceUseProgrammaticEvents = false;
-    
     public UIUtils() {
         FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("font.ttf"));
         FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
@@ -121,16 +119,15 @@ public class UIUtils {
         
     }
     
-    public Slider addSliderWithEditableLabel(final float[] sliderLimits, float defaultValue, TextField.TextFieldFilter textFieldFilter, final ChangeListener textFieldChangeListener, Stage stage, Group group, float x, float y, float width, float height) {
+    public Slider addSliderWithEditableLabel(final float[] sliderLimits, float defaultValue, TextField.TextFieldFilter textFieldFilter, final ChangeListener textFieldChangeListener, final Stage stage, Group group, float x, float y, float width, float height) {
         final Slider slider = new Slider(sliderLimits[0], sliderLimits[1], 0.01f, false, sliderStyle);
         slider.setValue(defaultValue);
         final TextField textLabel = new TextField("" + formatNumber(2, defaultValue), textFieldStyle);
         textLabel.setTextFieldFilter(textFieldFilter);
-        final boolean[] userInteracted = {false};
         slider.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                if(userInteracted[0] || forceUseProgrammaticEvents){
+                if(!textLabel.hasKeyboardFocus()) {
                     textLabel.setText("" + formatNumber(2, slider.getValue()));
                 }
             }
@@ -138,20 +135,14 @@ public class UIUtils {
         slider.addListener(new ClickListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                userInteracted[0] = true;
+                stage.setKeyboardFocus(null);
                 return super.touchDown(event, x, y, pointer, button);
-            }
-            
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                userInteracted[0] = false;
-                super.touchUp(event, x, y, pointer, button);
             }
         });
         textLabel.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                if(!userInteracted[0] && !forceUseProgrammaticEvents){
+                if(textLabel.hasKeyboardFocus()){
                     try {
                         float value = Float.parseFloat(textLabel.getText());
                         if(value > sliderLimits[1] || value < sliderLimits[0]){
