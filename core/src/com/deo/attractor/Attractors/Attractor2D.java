@@ -81,8 +81,8 @@ public class Attractor2D {
     private int duration = 30;
     private int frames = duration * FPS;
     private int currentFrame = 0;
-    private long lastZoomTranslateTime;
-    private boolean needIntensityMapUpdate;
+    private volatile long lastZoomTranslateTime;
+    private volatile boolean needIntensityMapUpdate;
     private final Array<Integer> computeIterationsPrev = new Array<>();
     private final Array<Float> deltaPrev = new Array<>();
     private int computedIterations;
@@ -817,11 +817,6 @@ public class Attractor2D {
                         getAttractorDimensions();
                         updateIntensityMap(3000000);
                         needIntensityMapUpdate = true;
-                    }
-                    try {
-                        Thread.sleep(10);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
                     }
                 }
             }
