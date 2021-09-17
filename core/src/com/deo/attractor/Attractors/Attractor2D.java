@@ -188,14 +188,14 @@ public class Attractor2D {
         uiGroup = new Group();
         
         final Slider iterationCutOffSlider = uiUtils.addSliderWithEditableLabel(new float[]{0.1f, 1}, iterationCutOff,
-                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 235, 500, 25);
+                new DigitFilter(false, true), null, stage, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 235, 500, 25);
         rgbMultipliers = palettes.get(currentPalette).get("rgbMultipliers").asFloatArray();
         final Slider redValueSlider = uiUtils.addSliderWithEditableLabel(new float[]{0, 6}, rgbMultipliers[0],
-                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 185, 500, 25);
+                new DigitFilter(false, true), null, stage, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 185, 500, 25);
         final Slider greenValueSlider = uiUtils.addSliderWithEditableLabel(new float[]{0, 6}, rgbMultipliers[1],
-                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 135, 500, 25);
+                new DigitFilter(false, true), null, stage, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 135, 500, 25);
         final Slider blueValueSlider = uiUtils.addSliderWithEditableLabel(new float[]{0, 6}, rgbMultipliers[2],
-                new DigitFilter(false, true), null, null, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 85, 500, 25);
+                new DigitFilter(false, true), null, stage, uiGroup, -WIDTH / 2f + 630, -HEIGHT / 2f + 85, 500, 25);
         iterationCutOffSlider.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
