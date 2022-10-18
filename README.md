@@ -1,4 +1,4 @@
-<h1 id="title">AttractorSimulator<h1>
+<h1 id="title">AttractorSimulator </h1>
 
 <img src="https://user-images.githubusercontent.com/34401005/196242230-7e08eb3b-73c7-456e-8b37-b490cee37111.jpg" height=150 id="icon"></img>
 
