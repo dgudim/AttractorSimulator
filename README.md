@@ -1,6 +1,6 @@
-# AttractorSimulator
+<h1 id="title">AttractorSimulator<h1>
 
-<img src="https://user-images.githubusercontent.com/34401005/196242230-7e08eb3b-73c7-456e-8b37-b490cee37111.jpg" height=150></img>
+<img src="https://user-images.githubusercontent.com/34401005/196242230-7e08eb3b-73c7-456e-8b37-b490cee37111.jpg" height=150 id="icon"></img>
 
 A simple 2d and 3d chaos attractor visualiser written in java and libGDX
 
@@ -58,6 +58,6 @@ https://github.com/dgudim/AttractorSimulator
 
 | [Here is an example of what is possible with this software](https://youtu.be/8ttGBReE5gg) |
 | - |
-| <a href="https://youtu.be/8ttGBReE5gg"><img src="https://user-images.githubusercontent.com/34401005/196383368-2985c626-5d16-491e-9df5-40822e540c7f.png"></img></a> |
+| <a href="https://youtu.be/8ttGBReE5gg"><img src="https://user-images.githubusercontent.com/34401005/196383368-2985c626-5d16-491e-9df5-40822e540c7f.png" id="thumb"></img></a> |
 
 
