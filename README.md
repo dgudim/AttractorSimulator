@@ -22,6 +22,8 @@ A simple 2d and 3d chaos attractor visualiser written in java and libGDX
     - Aizawa 
 - A variety of different color palettes
 - Extensible through json configs
+- 19 presets to play with
+- Word to attractor converter, visualize your name!
 ```json
 "PRODUCT": {
   "displayName": "Product",
